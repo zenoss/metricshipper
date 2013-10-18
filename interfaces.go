@@ -1,7 +1,7 @@
-package publisher
+package metricd
 
 import (
-    "encoding/json"
+	"encoding/json"
 )
 
 type PublisherError struct {
@@ -24,35 +24,35 @@ type Metric struct {
 
 // Structure of message forwarded via websocket
 type MetricBatch struct {
-    Control *interface{} `json:"control"` // Should be nil
-    Metrics *([]Metric) `json:"metrics"`
+	Control *interface{} `json:"control"` // Should be nil
+	Metrics *([]Metric)  `json:"metrics"`
 }
 
 // Create a new MetricBatch
 func NewMetricBatch() *MetricBatch {
-    b := &MetricBatch{
-        Metrics: &[]Metric{},
-    }
-    return b
+	b := &MetricBatch{
+		Metrics: &[]Metric{},
+	}
+	return b
 }
 
 // Convert a JSON-serialized metric into an instance
 func MetricFromJSON(s []byte) (*Metric, error) {
-    m := &Metric{}
-    err := json.Unmarshal(s, m)
-    if err != nil {
-        return nil, err
-    }
-    return m, nil
+	m := &Metric{}
+	err := json.Unmarshal(s, m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
-// Reads metrics from redis
-type RedisReader struct {
-    c chan Metric
+type WebsocketForwarder struct {
+	c chan Metric
 }
 
-func NewRedisReader() *RedisReader {
-    r := &RedisReader{
-    }
-    return r
+func NewWebsocketForwarder() *WebsocketForwarder {
+	f := &WebsocketForwarder{
+		c: make(chan Metric),
+	}
+	return f
 }
