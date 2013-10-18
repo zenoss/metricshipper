@@ -24,16 +24,8 @@ type Metric struct {
 
 // Structure of message forwarded via websocket
 type MetricBatch struct {
-	Control *interface{} `json:"control"` // Should be nil
-	Metrics *([]Metric)  `json:"metrics"`
-}
-
-// Create a new MetricBatch
-func NewMetricBatch() *MetricBatch {
-	b := &MetricBatch{
-		Metrics: &[]Metric{},
-	}
-	return b
+	Control interface{} `json:"control"` // Should be nil
+	Metrics []Metric    `json:"metrics"`
 }
 
 // Convert a JSON-serialized metric into an instance
@@ -44,15 +36,4 @@ func MetricFromJSON(s []byte) (*Metric, error) {
 		return nil, err
 	}
 	return m, nil
-}
-
-type WebsocketForwarder struct {
-	c chan Metric
-}
-
-func NewWebsocketForwarder() *WebsocketForwarder {
-	f := &WebsocketForwarder{
-		c: make(chan Metric),
-	}
-	return f
 }

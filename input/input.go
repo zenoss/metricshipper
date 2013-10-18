@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"github.com/iancmcc/metricd"
+	"github.com/zenoss/glog"
 	"net/url"
 	"strconv"
 	"strings"
@@ -40,7 +41,8 @@ func ParseRedisUri(uri string) (config *RedisConnectionConfig, err error) {
 			config.Port, _ = strconv.Atoi(parts[1])
 		}
 	}
-	segments := strings.Split(parsed.Path, "/")
+	glog.Infoln("Path:", parsed.Path)
+	segments := strings.SplitN(strings.TrimLeft(parsed.Path, "/"), "/", 3)
 	if len(segments) > 0 {
 		config.Database = segments[0]
 	}
@@ -55,12 +57,16 @@ func dialFunc(config *RedisConnectionConfig) func() (redis.Conn, error) {
 	return func() (redis.Conn, error) {
 		c, err := redis.Dial("tcp", config.Server())
 		if err != nil {
+			glog.Fatal("Unable to connect to Redis")
 			return nil, err
 		}
+		glog.Infoln("Dialed connection to redis")
 		_, err = c.Do("SELECT", config.Database)
 		if err != nil {
+			glog.Fatal("Unable to select database")
 			return nil, err
 		}
+		glog.Infoln("Using database", config.Database)
 		return c, nil
 	}
 }
@@ -89,22 +95,24 @@ func (r *RedisReader) Drain() {
 		conn.Send("LTRIM", r.queue_name, r.batch_size, -1)
 		values, err := redis.Values(conn.Do("EXEC"))
 		if err != nil {
-			// Log error here but don't stop
+			glog.Fatal("Error retrieving redis values")
 		}
 		if _, err := redis.Scan(values, &rangeresult, &ltrimresult); err != nil {
-			// Log error here but don't stop
+			glog.Fatal("Error scanning redis values")
 		}
 		// If no metrics were returned, this goroutine's job is done
 		if len(rangeresult) == 0 {
 			break
 		}
+
 		// Else, deserialize each metric and shove it down the channel
 		for _, m := range rangeresult {
 			met, err := metricd.MetricFromJSON([]byte(m))
 			if err != nil {
-				// Log that we got an invalid metric
+				glog.Fatal("Invalid metric")
+			} else {
+				r.Incoming <- *met
 			}
-			r.Incoming <- *met
 		}
 	}
 }
@@ -116,7 +124,11 @@ func (r *RedisReader) Subscribe() (err error) {
 	psc := redis.PubSubConn{
 		Conn: conn,
 	}
-	psc.Subscribe(r.control_name)
+	err = psc.Subscribe(r.control_name)
+	if err != nil {
+		glog.Fatal("Unable to subscribe to redis")
+	}
+	glog.Info("Subscribed to redis")
 	defer psc.Unsubscribe()
 	for {
 		m := psc.Receive()
@@ -135,6 +147,9 @@ func (r *RedisReader) Subscribe() (err error) {
 			return
 		}
 	}
+	for i := 0; i < r.concurrency; i++ {
+		go r.Drain()
+	}
 	return nil
 }
 
@@ -144,6 +159,9 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	if err != nil {
 		return nil, err
 	}
+	glog.Infoln("Connecting to redis server", config.Server())
+	glog.Infoln("Metrics database:", config.Database)
+	glog.Infoln("Metrics queue name:", config.Channel)
 	reader = &RedisReader{
 		Incoming: make(chan metricd.Metric, buffer_size),
 		pool: &redis.Pool{
