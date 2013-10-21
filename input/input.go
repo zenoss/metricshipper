@@ -81,39 +81,45 @@ type RedisReader struct {
 	control_name string
 }
 
+// Read a batch of metrics
+func (r *RedisReader) ReadBatch(conn redis.Conn) (count int) {
+	var rangeresult []string
+	// Read in a chunk of metrics up to the batch size
+	conn.Send("MULTI")
+	conn.Send("LRANGE", r.queue_name, 0, r.batch_size-1)
+	conn.Send("LTRIM", r.queue_name, r.batch_size, -1)
+	values, err := redis.Values(conn.Do("EXEC"))
+	if err != nil {
+		glog.Fatal(err)
+		glog.Fatal("Error retrieving redis values")
+	}
+	if _, err := redis.Scan(values, &rangeresult); err != nil {
+		glog.Infoln(err)
+		glog.Fatal("Error scanning redis values")
+	}
+
+	// Else, deserialize each metric and shove it down the channel
+	for _, m := range rangeresult {
+		met, err := metricd.MetricFromJSON([]byte(m))
+		if err != nil {
+			glog.Fatal("Invalid metric")
+		} else {
+			r.Incoming <- *met
+		}
+	}
+	return len(rangeresult)
+}
+
 // Drain the redis queue into the out channel until there's nothing left.
 func (r *RedisReader) Drain() {
 	conn := r.pool.Get()
 	defer conn.Close()
 	for {
-		var rangeresult []string
-
-		// Read in a chunk of metrics up to the batch size
-		conn.Send("MULTI")
-		conn.Send("LRANGE", r.queue_name, 0, r.batch_size-1)
-		conn.Send("LTRIM", r.queue_name, r.batch_size, -1)
-		values, err := redis.Values(conn.Do("EXEC"))
-		if err != nil {
-			glog.Fatal("Error retrieving redis values")
-		}
-		if _, err := redis.Scan(values, &rangeresult); err != nil {
-			glog.Infoln(err)
-			glog.Fatal("Error scanning redis values")
-		}
+		count := r.ReadBatch(conn)
 		// If no metrics were returned, this goroutine's job is done
-		if len(rangeresult) == 0 {
+		if count == 0 {
 			glog.Info("Stopping reading from redis, nothing left")
 			break
-		}
-
-		// Else, deserialize each metric and shove it down the channel
-		for _, m := range rangeresult {
-			met, err := metricd.MetricFromJSON([]byte(m))
-			if err != nil {
-				glog.Fatal("Invalid metric")
-			} else {
-				r.Incoming <- *met
-			}
 		}
 	}
 }
