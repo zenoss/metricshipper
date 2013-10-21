@@ -12,6 +12,7 @@ type MetricProcessor struct {
 func (m *MetricProcessor) Start() {
 	for {
 		metric := <-*m.Incoming
+
 		processed, err := m.Process(&metric)
 		if err != nil {
 			// Log

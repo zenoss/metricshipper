@@ -25,7 +25,7 @@ func main() {
 	}
 	// Next, try to talk to redis
 	glog.Info("Initiating 2 connections to redis")
-	r, err := input.NewRedisReader("redis://localhost:6379/0/metrics", 128, 1024, 1)
+	r, err := input.NewRedisReader("redis://127.0.0.1:6379/0/metrics", 128, 1024, 1)
 	if err != nil {
 		glog.Fatal("Unable to create redis reader")
 		return
@@ -34,7 +34,7 @@ func main() {
 	glog.Info("Warming up the processor")
 	p := &processor.MetricProcessor{
 		Incoming: &r.Incoming,
-		Outgoing: &r.Incoming,
+		Outgoing: &w.Outgoing,
 	}
 	go p.Start()
 

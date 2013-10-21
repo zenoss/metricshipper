@@ -42,7 +42,7 @@ func ParseRedisUri(uri string) (config *RedisConnectionConfig, err error) {
 		}
 	}
 	glog.Infoln("Path:", parsed.Path)
-	segments := strings.SplitN(strings.TrimLeft(parsed.Path, "/"), "/", 3)
+	segments := strings.Split(strings.TrimLeft(parsed.Path, "/"), "/")
 	if len(segments) > 0 {
 		config.Database = segments[0]
 	}
@@ -87,7 +87,6 @@ func (r *RedisReader) Drain() {
 	defer conn.Close()
 	for {
 		var rangeresult []string
-		var ltrimresult int
 
 		// Read in a chunk of metrics up to the batch size
 		conn.Send("MULTI")
@@ -97,11 +96,13 @@ func (r *RedisReader) Drain() {
 		if err != nil {
 			glog.Fatal("Error retrieving redis values")
 		}
-		if _, err := redis.Scan(values, &rangeresult, &ltrimresult); err != nil {
+		if _, err := redis.Scan(values, &rangeresult); err != nil {
+			glog.Infoln(err)
 			glog.Fatal("Error scanning redis values")
 		}
 		// If no metrics were returned, this goroutine's job is done
 		if len(rangeresult) == 0 {
+			glog.Info("Stopping reading from redis, nothing left")
 			break
 		}
 
@@ -119,6 +120,9 @@ func (r *RedisReader) Drain() {
 
 // Start listening to the control channel
 func (r *RedisReader) Subscribe() (err error) {
+	for i := 0; i < r.concurrency; i++ {
+		go r.Drain()
+	}
 	conn := r.pool.Get()
 	defer conn.Close()
 	psc := redis.PubSubConn{
@@ -147,9 +151,6 @@ func (r *RedisReader) Subscribe() (err error) {
 			return
 		}
 	}
-	for i := 0; i < r.concurrency; i++ {
-		go r.Drain()
-	}
 	return nil
 }
 
@@ -162,10 +163,11 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	glog.Infoln("Connecting to redis server", config.Server())
 	glog.Infoln("Metrics database:", config.Database)
 	glog.Infoln("Metrics queue name:", config.Channel)
+	glog.Infoln("Concurrency:", concurrency)
 	reader = &RedisReader{
 		Incoming: make(chan metricd.Metric, buffer_size),
 		pool: &redis.Pool{
-			MaxActive:   concurrency + 1,
+			MaxActive:   concurrency + 2,
 			IdleTimeout: 240 * time.Second, // TODO: Configurable?
 			Dial:        dialFunc(config),
 		},

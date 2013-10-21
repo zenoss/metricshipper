@@ -15,7 +15,7 @@ type WebsocketPublisher struct {
 	concurrency int
 	conn        chan *websocket.Conn
 	batch_size  int
-	Outgoing    chan *metricd.Metric
+	Outgoing    chan metricd.Metric
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int, batch_size int) (publisher *WebsocketPublisher, err error) {
@@ -32,7 +32,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int, batch_s
 		concurrency: concurrency,
 		conn:        make(chan *websocket.Conn, concurrency),
 		batch_size:  batch_size,
-		Outgoing:    make(chan *metricd.Metric, buffer_size),
+		Outgoing:    make(chan metricd.Metric, buffer_size),
 	}, nil
 }
 
@@ -68,7 +68,7 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 
 func (w *WebsocketPublisher) DoBatch() {
 	for {
-		buf := make([]metricd.Metric, w.batch_size)
+		buf := make([]metricd.Metric, 0)
 		batch := &metricd.MetricBatch{
 			Metrics: buf,
 		}
@@ -83,14 +83,15 @@ func (w *WebsocketPublisher) DoBatch() {
 				case <-timer:
 					break Batch
 				case m := <-w.Outgoing:
-					buf = append(buf, *m)
+					buf = append(buf, m)
 				}
 			}
 			if len(buf) > 0 {
-				//glog.Infoln("Sending", len(buf), "metrics to consumer")
+				batch.Metrics = buf
 				err := websocket.JSON.Send(conn, batch)
 				if err != nil {
 					// Dead connection; don't put it back, add another
+					glog.Infoln("stuff")
 					conn.Close()
 					w.AddConn()
 				} else {
