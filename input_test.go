@@ -1,4 +1,4 @@
-package input
+package metricd
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ func newReader(t *testing.T) *RedisReader {
 	r := &RedisReader{
 		Incoming: make(chan Metric, 20),
 		pool: &redis.Pool{
-			MaxActive:   2,
+			MaxActive:   3,
 			IdleTimeout: 10,
 			Dial:        dial,
 		},
@@ -124,4 +124,32 @@ func TestDrain(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
+	// Create and subscribe a reader
+	reader := newReader(t)
+	go reader.Subscribe()
+
+	// Add 10 messages
+	conn := reader.pool.Get()
+	defer conn.Close()
+	defer conn.Do("DEL", queue_name)
+	conn.Do("DEL", queue_name)
+	for i := 0; i < 10; i++ {
+		sendone(conn)
+	}
+	conn.Flush()
+	llen, _ := redis.Int(conn.Do("LLEN", queue_name))
+	if llen != 10 {
+		t.Error("Messages did not make it to redis")
+	}
+
+	// Now send a control message
+	conn.Send("RPUSH", queue_name+"-control", 1)
+	// Give subscriber some cycles to read
+	time.Sleep(5 * time.Millisecond)
+
+	// Check the length now, should have been read
+	llen, _ = redis.Int(conn.Do("LLEN", queue_name))
+	if llen != 0 {
+		t.Error("Subscriber didn't hear control message")
+	}
 }
