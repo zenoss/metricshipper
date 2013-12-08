@@ -52,15 +52,6 @@ func dial() (redis.Conn, error) {
 		return nil, err
 	}
 
-	//n, err := redis.Int(c.Do("DBSIZE"))
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//if n != 0 {
-	//	return nil, errors.New("database #9 is not empty, test can not continue")
-	//}
-
 	return testConn{c}, nil
 }
 
@@ -68,6 +59,28 @@ func sendone(conn redis.Conn) {
 	m := &Metric{}
 	s, _ := json.Marshal(m)
 	conn.Send("RPUSH", queue_name, s)
+}
+
+func TestParseRedisUri(t *testing.T) {
+	config, err := ParseRedisUri("redis://localhost:6379/0/channel")
+	if err != nil {
+		t.Error("Unable to parse valid URL")
+	}
+	if config.Dialect != "redis" {
+		t.Error("Unexpected scheme")
+	}
+	if config.Host != "localhost" {
+		t.Error("Unexpected host")
+	}
+	if config.Port != 6379 {
+		t.Error("Unexpected port")
+	}
+	if config.Database != "0" {
+		t.Error("Unexpected db")
+	}
+	if config.Channel != "channel" {
+		t.Error("Unexpected channel")
+	}
 }
 
 func TestReadBatch(t *testing.T) {
