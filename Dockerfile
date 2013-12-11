@@ -1,7 +1,13 @@
 FROM ubuntu
 MAINTAINER Zenoss, Inc <dev@zenoss.com>
 
-RUN wget -O- http://go.googlecode.com/files/go1.1.2.linux-amd64.tar.gz | tar -C / -xz
+RUN echo 'deb http://archive.ubuntu.com/ubuntu precise main universe' > /etc/apt/sources.list
+RUN apt-get update
+RUN apt-get install -y -q wget git-core make mercurial
+RUN apt-get install -y -q redis-server
+RUN wget -qO- http://go.googlecode.com/files/go1.1.2.linux-amd64.tar.gz | tar -C / -xz
 ENV GOROOT /go
-env GOPATH /go
+ENV GOPATH /gosrc
 ENV PATH $PATH:/go/bin
+
+WORKDIR /gosrc/src/github.com/zenoss/metricd
