@@ -1,6 +1,6 @@
 
 
-default: build
+default: dockerbuild
 
 build: test
 	@mkdir build
