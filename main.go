@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/zenoss/glog"
-	"github.com/zenoss/metricd"
+	metricd "github.com/zenoss/metricd/lib"
 )
 
 func main() {
