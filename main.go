@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/zenoss/glog"
-	metricshipper "github.com/zenoss/metricshipper/lib"
+	"github.com/zenoss/metricshipper/lib"
 )
 
 func main() {

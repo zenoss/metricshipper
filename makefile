@@ -10,7 +10,7 @@ build: output/metricshipper
 output/metricshipper:
 	@go get
 	@mkdir output
-	@cd output && go build $(PACKAGE) && chown -R $${UID}:$${UID} .
+	@cd output && go build $(PACKAGE)
 
 install: output/metricshipper
 	@install -m 755 output/metricshipper $$ZENHOME/bin
@@ -25,7 +25,7 @@ docker:
 
 dockertest: docker
 	@docker build -t zenoss/metricshipper-build .
-	@docker run -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test"
+	@docker run -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test && chown -R $${UID}:$${UID} /gosrc/src/$(PACKAGE)/output"
 
 dockerbuild: docker
 	@docker build -t zenoss/metricshipper-build .
