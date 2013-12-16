@@ -1,10 +1,15 @@
+default: build
 
+.PHONY: default build install test docker dockertest clean
 
-default: dockerbuild
+build: output/metricshipper
 
-build: test
-	@mkdir build
-	@cd build && go build github.com/zenoss/metricshipper && chown -R $${UID}:$${UID} .
+output/metricshipper:
+	@mkdir output
+	@cd output && go build github.com/zenoss/metricshipper && chown -R $${UID}:$${UID} .
+
+install: output/metricshipper
+	@install -m 755 -g zenoss -o zenoss output/metricshipper $$ZENHOME/bin
 
 test: 
 	@/etc/init.d/redis-server start
@@ -15,10 +20,10 @@ test:
 docker:
 	@docker ps > /dev/null && echo "Docker ok"
 
-dockerbuild: docker
+dockertest: docker
 	@docker build -t zenoss/metricshipper-build .
-	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/github.com/zenoss/metricshipper -t zenoss/metricshipper-build make clean build
+	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/github.com/zenoss/metricshipper -t zenoss/metricshipper-build make clean test
 
 clean:
 	@go clean
-	@rm -rf build
+	@rm -rf output
