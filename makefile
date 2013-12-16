@@ -8,6 +8,7 @@ default: build
 build: output/metricshipper
 
 output/metricshipper:
+	@go get
 	@mkdir output
 	@cd output && go build $(PACKAGE) && chown -R $${UID}:$${UID} .
 
@@ -29,6 +30,17 @@ dockertest: docker
 dockerbuild: docker
 	@docker build -t zenoss/metricshipper-build .
 	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build make clean build
+
+scratchbuild:
+	@export GOPATH=/tmp/metricshipper-build; \
+		BUILDDIR=$$GOPATH/src/$(PACKAGE); \
+		HERE=$$PWD; \
+		mkdir -p $$BUILDDIR; \
+		rsync -rad $$HERE/ $$BUILDDIR ; \
+		cd $$BUILDDIR; \
+		$(MAKE) clean build; \
+		mkdir -p $$HERE/output; \
+		mv $$BUILDDIR/output/* $$HERE/output
 
 clean:
 	@go clean
