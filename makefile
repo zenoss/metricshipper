@@ -12,7 +12,6 @@ install: output/metricshipper
 	@install -m 755 output/metricshipper $$ZENHOME/bin
 
 test: 
-	@/etc/init.d/redis-server start
 	@go get
 	@go test github.com/zenoss/metricshipper/lib
 	@go test github.com/zenoss/metricshipper
@@ -22,7 +21,7 @@ docker:
 
 dockertest: docker
 	@docker build -t zenoss/metricshipper-build .
-	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/github.com/zenoss/metricshipper -t zenoss/metricshipper-build make clean test
+	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/github.com/zenoss/metricshipper -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test"
 
 dockerbuild: docker
 	@docker build -t zenoss/metricshipper-build .
