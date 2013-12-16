@@ -1,4 +1,4 @@
-package metricd
+package metricshipper
 
 import (
 	"encoding/json"

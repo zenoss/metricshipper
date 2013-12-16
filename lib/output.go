@@ -1,4 +1,4 @@
-package metricd
+package metricshipper
 
 import (
 	"code.google.com/p/go.net/websocket"

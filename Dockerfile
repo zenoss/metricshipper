@@ -10,4 +10,4 @@ ENV GOROOT /go
 ENV GOPATH /gosrc
 ENV PATH $PATH:/go/bin
 
-WORKDIR /gosrc/src/github.com/zenoss/metricd
+WORKDIR /gosrc/src/github.com/zenoss/metricshipper
