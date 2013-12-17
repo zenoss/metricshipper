@@ -25,11 +25,11 @@ docker:
 
 dockertest: docker
 	@docker build -t zenoss/metricshipper-build .
-	@docker run -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test && chown -R $${UID}:$${UID} /gosrc/src/$(PACKAGE)/output"
+	@docker run -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test"
 
 dockerbuild: docker
 	@docker build -t zenoss/metricshipper-build .
-	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build make clean build
+	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "make clean build && chown -R $${UID}:$${UID} /gosrc/src/$(PACKAGE)/output"
 
 scratchbuild:
 	@export GOPATH=/tmp/metricshipper-build; \
