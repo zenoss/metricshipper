@@ -22,6 +22,6 @@ _testmain.go
 *.exe
 *.test
 
-build
+output
 metricd/metricd
 coverage.out
