@@ -1,3 +1,4 @@
+PREFIX ?= /opt/zenoss
 PACKAGE=github.com/zenoss/metricshipper
 
 
@@ -13,7 +14,7 @@ output/metricshipper:
 	@cd output && go build $(PACKAGE)
 
 install: output/metricshipper
-	@install -m 755 output/metricshipper $$ZENHOME/bin
+	@install -m 755 output/metricshipper $(PREFIX)/bin
 
 test: 
 	@go get
