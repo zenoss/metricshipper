@@ -10,28 +10,34 @@ import (
 var origin string = "http://localhost"
 
 type WebsocketPublisher struct {
-	config      *websocket.Config
-	concurrency int
-	conn        chan *websocket.Conn
-	batch_size  int
-	Outgoing    chan Metric
+	config        *websocket.Config
+	concurrency   int
+	conn          chan *websocket.Conn
+	batch_size    int
+	batch_timeout float64
+	Outgoing      chan Metric
 }
 
-func NewWebsocketPublisher(uri string, concurrency int, buffer_size int, batch_size int) (publisher *WebsocketPublisher, err error) {
+func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
+	batch_size int, batch_timeout float64, username string,
+	password string) (publisher *WebsocketPublisher, err error) {
+
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
 		return nil, err
 	}
-	data := []byte("admin:zenoss") // TODO: Configurable auth
+
+	data := []byte(username + ":" + password)
 	str := base64.StdEncoding.EncodeToString(data)
 	config.Header.Add("Authorization", "basic "+str)
 
 	return &WebsocketPublisher{
-		config:      config,
-		concurrency: concurrency,
-		conn:        make(chan *websocket.Conn, concurrency),
-		batch_size:  batch_size,
-		Outgoing:    make(chan Metric, buffer_size),
+		config:        config,
+		concurrency:   concurrency,
+		conn:          make(chan *websocket.Conn, concurrency),
+		batch_size:    batch_size,
+		batch_timeout: batch_timeout,
+		Outgoing:      make(chan Metric, buffer_size),
 	}, nil
 }
 
@@ -57,7 +63,7 @@ func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn) {
 func (w *WebsocketPublisher) AddConn() (err error) {
 	conn, err := websocket.DialConfig(w.config)
 	if err != nil {
-		glog.Fatal(err)
+		glog.Error(err)
 		return err
 	}
 	w.conn <- conn
@@ -74,7 +80,7 @@ func (w *WebsocketPublisher) DoBatch() {
 	Retry:
 		for {
 			conn := w.GetConn()
-			timer := time.After(1 * time.Second)
+			timer := time.After(time.Duration(w.batch_timeout) * time.Second)
 			remaining := w.batch_size - len(batch.Metrics)
 		Batch:
 			for i := 0; i < remaining; i++ {

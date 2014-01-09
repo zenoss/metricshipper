@@ -14,7 +14,8 @@ output/metricshipper:
 	@cd output && go build $(PACKAGE)
 
 install: output/metricshipper
-	@install -m 755 output/metricshipper $(PREFIX)/bin
+	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
+	@install -m 644 metricshipper.yaml $(PREFIX)/etc/metricshipper.yaml
 
 test: 
 	@go get
