@@ -18,7 +18,7 @@ install: output/metricshipper
 	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
 	@install -m 644 etc/metricshipper.yaml $(PREFIX)/etc/metricshipper/metricshipper.yaml
 	@install -m 644 etc/metricshipper_supervisor.conf $(PREFIX)/etc/metricshipper/metricshipper_supervisor.conf
-	@ln -s $(PREFIX)/etc/metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor
+	@ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor
 
 test: 
 	@go get
