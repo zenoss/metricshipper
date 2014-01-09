@@ -12,7 +12,7 @@ func testConfigValues(config map[string]interface{}, t *testing.T) {
 	result, _ := yaml.Marshal(config)
 	reader := strings.NewReader(string(result))
 	shipperConfig := &ShipperConfig{}
-	LoadConfig(reader, shipperConfig)
+	LoadYAMLConfig(reader, shipperConfig)
 	if shipperConfig == nil {
 		t.Error("Unable to parse config")
 	}
@@ -50,7 +50,7 @@ func TestBadValue(t *testing.T) {
 	result, _ := yaml.Marshal(config)
 	reader := strings.NewReader(string(result))
 	shipperConfig := &ShipperConfig{}
-	LoadConfig(reader, shipperConfig)
+	LoadYAMLConfig(reader, shipperConfig)
 	if shipperConfig.MaxBufferSize != 0 {
 		t.Error("Max buffer size was parsed despite being invalid")
 	}
@@ -61,7 +61,7 @@ func TestNoValue(t *testing.T) {
 	result, _ := yaml.Marshal(config)
 	reader := strings.NewReader(string(result))
 	shipperConfig := &ShipperConfig{}
-	LoadConfig(reader, shipperConfig)
+	LoadYAMLConfig(reader, shipperConfig)
 	if shipperConfig.RedisUrl != "" {
 		t.Error("Redis URL isn't empty")
 	}

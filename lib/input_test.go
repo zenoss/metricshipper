@@ -62,7 +62,7 @@ func sendone(conn redis.Conn) {
 }
 
 func TestParseRedisUri(t *testing.T) {
-	config, err := ParseRedisUri("redis://localhost:6379/0/channel")
+	config, err := parseRedisUri("redis://localhost:6379/0/channel")
 	if err != nil {
 		t.Error("Unable to parse valid URL")
 	}
