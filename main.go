@@ -4,6 +4,7 @@ import (
 	"github.com/zenoss/glog"
 	"github.com/zenoss/metricshipper/lib"
 	"os"
+	"runtime"
 )
 
 func naive_pluralize(i int, word string) string {
@@ -14,12 +15,26 @@ func naive_pluralize(i int, word string) string {
 	}
 }
 
+func numProcs(c *metricshipper.ShipperConfig) int {
+	max := runtime.NumCPU()
+	if c.CPUs == 0 || c.CPUs > max {
+		return max
+	}
+	return c.CPUs
+}
+
 func main() {
 	// Get us some configuration
 	config, err := metricshipper.ParseShipperConfig()
 	if err != nil {
 		os.Exit(1)
 	}
+
+	// Adjust parallelism to specified values or default to number of
+	// available logical CPUs
+	num := numProcs(config)
+	glog.Infof("Using %d %s", num, naive_pluralize(num, "processor"))
+	runtime.GOMAXPROCS(num)
 
 	// First, connect to the websocket
 	glog.Infof("Initiating %d %s to consumer", config.Writers,
