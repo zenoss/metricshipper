@@ -22,7 +22,7 @@ type ShipperConfig struct {
 	MaxBackoffSteps int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
 	Username        string  `long:"username" description:"Username to use when connecting to the consumer"`
 	Password        string  `long:"password" description:"Password to use when connecting to the consumer"`
-	CPUs            int     `long:"num-cpus" description:"Number of CPUs to use. Defaults to number of logical CPUs available."`
+	CPUs            int     `long:"num-cpus" description:"Number of CPUs to use." default:"4"`
 }
 
 func LoadYAMLConfig(reader io.Reader, cfg *ShipperConfig) error {
