@@ -49,3 +49,7 @@
 # Maximum number of slow-down messages to consider for exponential backoff.
 #
 #maxbackoffsteps: 16
+
+# Number of processors to use. Defaults to number of logical CPUs available.
+#
+#cpus:
