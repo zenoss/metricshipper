@@ -56,8 +56,12 @@ func (w *WebsocketPublisher) GetConn() *websocket.Conn {
 	return c
 }
 
-func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn) {
-	w.conn <- conn
+func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead bool) {
+	if dead {
+		w.AddConn()
+	} else {
+		w.conn <- conn
+	}
 }
 
 func (w *WebsocketPublisher) AddConn() (err error) {
@@ -71,37 +75,49 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 	return nil
 }
 
+func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
+	buf := make([]Metric, 0)
+	batch := &MetricBatch{
+		Metrics: buf,
+	}
+	remaining := w.batch_size - len(buf)
+	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
+	for i := 0; i < remaining; i++ {
+		select {
+		case <-timer:
+			i = remaining // Break out of the loop
+		case m := <-w.Outgoing:
+			buf = append(buf, m)
+		}
+	}
+	batch.Metrics = buf
+	return len(buf), batch
+}
+
+func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
+	var num int
+	dead := false
+	conn := w.GetConn()
+	defer w.ReleaseConn(conn, dead)
+	err := websocket.JSON.Send(conn, batch)
+	if err != nil {
+		dead = true
+		return num, err
+	}
+	num = len(batch.Metrics)
+	return num, nil
+}
+
 func (w *WebsocketPublisher) DoBatch() {
 	for {
-		buf := make([]Metric, 0)
-		batch := &MetricBatch{
-			Metrics: buf,
-		}
-	Retry:
-		for {
-			conn := w.GetConn()
-			timer := time.After(time.Duration(w.batch_timeout) * time.Second)
-			remaining := w.batch_size - len(batch.Metrics)
-		Batch:
-			for i := 0; i < remaining; i++ {
-				select {
-				case <-timer:
-					break Batch
-				case m := <-w.Outgoing:
-					buf = append(buf, m)
-				}
-			}
-			if len(buf) > 0 {
-				batch.Metrics = buf
-				err := websocket.JSON.Send(conn, batch)
-				if err != nil {
-					// Dead connection; don't put it back, add another
-					glog.Infoln("stuff")
-					conn.Close()
-					w.AddConn()
-				} else {
-					w.ReleaseConn(conn)
-					break Retry
+		// Retry loop
+		num, batch := w.getBatch()
+		if num > 0 {
+			for {
+				sent, err := w.sendBatch(batch)
+				if err == nil {
+					glog.Infof("Sent %d metrics to the consumer.", sent)
+					break
 				}
 			}
 		}

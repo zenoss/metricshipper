@@ -59,13 +59,11 @@ func dialFunc(config *RedisConnectionConfig) func() (redis.Conn, error) {
 			glog.Error("Unable to connect to Redis")
 			return nil, err
 		}
-		glog.Infoln("Dialed connection to redis")
 		_, err = c.Do("SELECT", config.Database)
 		if err != nil {
 			glog.Error("Unable to select database")
 			return nil, err
 		}
-		glog.Infoln("Using database", config.Database)
 		return c, nil
 	}
 }
