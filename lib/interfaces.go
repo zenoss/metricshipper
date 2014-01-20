@@ -14,12 +14,10 @@ func (s PublisherError) Error() string {
 
 // Defines the structure of a Metric message
 type Metric struct {
-	Timestamp float64 `json:"timestamp"`
-	Metric    string  `json:"metric"`
-	Value     float64 `json:"value"`
-	Tags      struct {
-		Device string `json:"device"`
-	} `json:"tags"`
+	Timestamp float64                `json:"timestamp"`
+	Metric    string                 `json:"metric"`
+	Value     float64                `json:"value"`
+	Tags      map[string]interface{} `json:"tags"`
 }
 
 // Structure of message forwarded via websocket
