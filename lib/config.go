@@ -16,7 +16,7 @@ type ShipperConfig struct {
 	ConsumerUrl     string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8080/ws/metrics/store"`
 	Writers         int     `long:"writers" description:"Maximum number of simultaneous writers to the consumer" default:"1"`
 	MaxBufferSize   int     `long:"max-buffer-size" description:"Maximum number of messages to keep in the internal buffer" default:"1024"`
-	MaxBatchSize    int     `long:"max-batch-size" description:"Number of messages to send to the consumer in a single web socket call. This should be smaller than the buffer size." default:"128"`
+	MaxBatchSize    int     `long:"max-batch-size" description:"Number of messages to send to the consumer in a single web socket call. This should be smaller than the buffer size." default:"64"`
 	BatchTimeout    float64 `long:"batch-timeout-seconds" description:"Maximum time in seconds to wait for messages from the internal buffer to be ready before making a web socket call with current metrics." default:"1"`
 	BackoffWindow   int     `long:"backoff-window-seconds" description:"Rolling time period in seconds to consider collision messages from the consumer." default:"60"`
 	MaxBackoffSteps int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
