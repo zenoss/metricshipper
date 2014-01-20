@@ -34,7 +34,7 @@
 # Maximum number of messages to send to the consumer in a single batch.
 # This should be smaller than the setting for maxbuffersize.
 #
-#maxbatchsize: 128
+#maxbatchsize: 64
 
 # Maximum time in seconds to wait for messages from the internal buffer to
 # be ready before sending a batch to the consumer.
