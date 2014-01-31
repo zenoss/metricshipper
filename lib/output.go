@@ -133,7 +133,7 @@ func (w *WebsocketPublisher) readResponse( conn *websocket.Conn) (bool, error) {
 
   for {
     n := 0
-    deadline := time.Now().Add( 500 * time.Millisecond)
+    deadline := time.Now().Add( time.Microsecond)
     err = conn.SetReadDeadline( deadline)
 
     msg := make([]byte, 1024)
