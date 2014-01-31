@@ -10,12 +10,13 @@ import (
 var origin string = "http://localhost"
 
 type WebsocketPublisher struct {
-	config        *websocket.Config
-	concurrency   int
-	conn          chan *websocket.Conn
-	batch_size    int
-	batch_timeout float64
-	Outgoing      chan Metric
+	config           *websocket.Config
+	concurrency      int
+	conn             chan *websocket.Conn
+	batch_size       int
+	batch_timeout    float64
+	Outgoing         chan Metric
+	retry_connection int
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
@@ -32,12 +33,13 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	config.Header.Add("Authorization", "basic "+str)
 
 	return &WebsocketPublisher{
-		config:        config,
-		concurrency:   concurrency,
-		conn:          make(chan *websocket.Conn, concurrency),
-		batch_size:    batch_size,
-		batch_timeout: batch_timeout,
-		Outgoing:      make(chan Metric, buffer_size),
+		config:           config,
+		concurrency:      concurrency,
+		conn:             make(chan *websocket.Conn, concurrency),
+		batch_size:       batch_size,
+		batch_timeout:    batch_timeout,
+		Outgoing:         make(chan Metric, buffer_size),
+		retry_connection: 1,
 	}, nil
 }
 
@@ -65,13 +67,25 @@ func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead bool) {
 }
 
 func (w *WebsocketPublisher) AddConn() (err error) {
-	conn, err := websocket.DialConfig(w.config)
+	attempts := 0
+	for {
+		if w.retry_connection > 0 && attempts >= w.retry_connection {
+			break
+		}
+		if conn, dailerr := websocket.DialConfig(w.config); dailerr == nil {
+			glog.Info("Made connection to consumer")
+			w.conn <- conn
+			break
+		} else {
+			err = dailerr
+		}
+		attempts += 1
+	}
+
 	if err != nil {
 		glog.Error(err)
 		return err
 	}
-	w.conn <- conn
-	glog.Info("Made connection to consumer")
 	return nil
 }
 
@@ -99,13 +113,43 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
 	dead := false
 	conn := w.GetConn()
 	defer w.ReleaseConn(conn, dead)
+
 	err := websocket.JSON.Send(conn, batch)
 	if err != nil {
 		dead = true
 		return num, err
 	}
+
 	num = len(batch.Metrics)
+  dead, err = w.readResponse( conn)
+
 	return num, nil
+}
+
+//read everything in the response buffer
+func (w *WebsocketPublisher) readResponse( conn *websocket.Conn) (bool, error) {
+  var err error
+  dead := false
+
+  for {
+    n := 0
+    deadline := time.Now().Add( 500 * time.Millisecond)
+    err = conn.SetReadDeadline( deadline)
+
+    msg := make([]byte, 1024)
+    if n, err = conn.Read( msg); err != nil {
+      dead = true
+      break
+    }
+    msg = msg[0:n]
+    if n == 0 {
+      break
+    }
+
+    glog.Infof( "Server responded with message: %s", string(msg))
+  }
+
+  return dead, err
 }
 
 func (w *WebsocketPublisher) DoBatch() {

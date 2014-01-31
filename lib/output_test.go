@@ -59,6 +59,14 @@ func startServer() {
 	log.Print("Test server listening on ", serverAddr)
 }
 
+func TestConnectFail(t *testing.T) {
+	defer clearBuffer()
+	pub, _ := NewWebsocketPublisher("ws://127.0.0.1:10101/metrics", 1, 1, 1, 1, "admin", "zenoss")
+	if err := pub.Start(); err != nil {
+		t.Errorf("Unable to connect: %s", err)
+	}
+}
+
 func TestConnect(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
