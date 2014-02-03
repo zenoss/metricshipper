@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/zenoss/glog"
 	"github.com/zenoss/metricshipper/lib"
-	"runtime"
-        "time"
 	"os"
+	"runtime"
+	"time"
 )
 
 func naive_pluralize(i int, word string) string {
@@ -43,7 +43,7 @@ func main() {
 	w, err := metricshipper.NewWebsocketPublisher(config.ConsumerUrl,
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, config.RetryConnection, time.Duration(config.RetryConnectionTimeout),
-                config.Username, config.Password)
+		config.Username, config.Password)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return

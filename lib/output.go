@@ -41,8 +41,8 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		batch_size:               batch_size,
 		batch_timeout:            batch_timeout,
 		Outgoing:                 make(chan Metric, buffer_size),
-		retry_connection:         1,
-		retry_connection_timeout: 1,
+		retry_connection:         retry_connection,
+		retry_connection_timeout: retry_connection_timeout,
 	}, nil
 }
 
@@ -81,7 +81,7 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 			break
 		} else {
 			err = dailerr
-			glog.Errorf("Error connecting to %s, attempt %d/%d: %s", w.config.Location, attempts, w.retry_connection, err)
+			glog.Errorf("Error connecting to (%+v), attempt %d/%d: %s", w.config.Location, attempts, w.retry_connection, err)
 			time.Sleep(w.retry_connection_timeout * time.Second)
 		}
 		attempts += 1
