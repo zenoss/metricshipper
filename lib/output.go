@@ -151,7 +151,7 @@ func (w *WebsocketPublisher) readResponse(conn *websocket.Conn) (bool, error) {
 			break
 		}
 
-		glog.Infof("Server responded with message: %s", string(msg))
+		glog.V(2).Infof("Server responded with message: %s", string(msg))
 	}
 
 	return dead, err
@@ -165,8 +165,10 @@ func (w *WebsocketPublisher) DoBatch() {
 			for {
 				sent, err := w.sendBatch(batch)
 				if err == nil {
-					glog.Infof("Sent %d metrics to the consumer.", sent)
+					glog.V(2).Infof("Sent %d metrics to the consumer.", sent)
 					break
+				} else {
+					glog.Errorf("Failed sending %d metrics to the consumer: %s", num, err)
 				}
 			}
 		}
