@@ -1,8 +1,10 @@
 package metricshipper
 
 import (
+	"github.com/zenoss/glog"
 	"github.com/imdario/mergo"
 	flags "github.com/zenoss/go-flags"
+
 	"io"
 	"io/ioutil"
 	yaml "launchpad.net/goyaml"
@@ -22,6 +24,7 @@ type ShipperConfig struct {
 	MaxBackoffSteps        int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
 	RetryConnection        int     `long:"retry-connection" description:"Maxiumum retry connections before failing, zero or less implies infinite" default:"0"`
 	RetryConnectionTimeout int     `long:"retry-connection-timeout" description:"Sleep time between connection retry in seconds" default:"1"`
+	Verbosity              int     `long:"verbosity" short:"v" description:"Set the glog logging verbosity" default:"0"`
 	Username               string  `long:"username" description:"Username to use when connecting to the consumer"`
 	Password               string  `long:"password" description:"Password to use when connecting to the consumer"`
 	CPUs                   int     `long:"num-cpus" description:"Number of CPUs to use." default:"4"`
@@ -65,6 +68,8 @@ func ParseShipperConfig() (*ShipperConfig, error) {
 
 	// Replace any remaining zero-value entries with defaults
 	mergo.Merge(commandlineopts, *defaultopts)
+
+	glog.SetVerbosity(commandlineopts.Verbosity)
 
 	return commandlineopts, nil
 }

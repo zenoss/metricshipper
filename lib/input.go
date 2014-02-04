@@ -81,6 +81,9 @@ type RedisReader struct {
 // Read a batch of metrics
 func (r *RedisReader) ReadBatch(conn redis.Conn) (count int) {
 	var rangeresult []string
+	glog.V(2).Infof("enter RedisReader.ReadBatch( conn=%s)", conn)
+	defer glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%s) count=%d", conn, count)
+
 	// Read in a chunk of metrics up to the batch size
 	conn.Send("MULTI")
 	conn.Send("LRANGE", r.queue_name, 0, r.batch_size-1)
@@ -103,12 +106,16 @@ func (r *RedisReader) ReadBatch(conn redis.Conn) (count int) {
 			r.Incoming <- *met
 		}
 	}
-	return len(rangeresult)
+
+	count = len(rangeresult)
+	return count
 }
 
 // Drain the redis queue into the out channel until there's nothing left.
 func (r *RedisReader) Drain() {
 	conn := r.pool.Get()
+	glog.V(2).Infof("enter RedisReader.Drain()")
+	defer glog.V(2).Infof("exit RedisReader.Drain()")
 	defer conn.Close()
 	for {
 		count := r.ReadBatch(conn)

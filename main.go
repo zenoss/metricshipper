@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/zenoss/glog"
 	"github.com/zenoss/metricshipper/lib"
+
 	"os"
 	"runtime"
 	"time"

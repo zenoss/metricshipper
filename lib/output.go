@@ -62,6 +62,9 @@ func (w *WebsocketPublisher) GetConn() *websocket.Conn {
 }
 
 func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead bool) {
+	glog.V(2).Infof("enter ReleaseConn(), conn=%s, dead=%s", conn, dead)
+	defer glog.V(2).Infof("exit ReleaseConn(), conn=%s, dead=%d", conn, dead)
+
 	if dead {
 		w.AddConn()
 	} else {
@@ -95,10 +98,13 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 }
 
 func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
+	glog.V(2).Infof("enter getBatch()")
 	buf := make([]Metric, 0)
 	batch := &MetricBatch{
 		Metrics: buf,
 	}
+	defer glog.V(2).Infof("exit getBatch(), len(buf)=%d, batch=%s", len(buf), batch)
+
 	remaining := w.batch_size - len(buf)
 	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
 	for i := 0; i < remaining; i++ {
@@ -110,6 +116,7 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
 		}
 	}
 	batch.Metrics = buf
+
 	return len(buf), batch
 }
 
@@ -117,6 +124,8 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
 	var num int
 	dead := false
 	conn := w.GetConn()
+	glog.V(2).Infof("enter sendBatch(), conn=%s, batch=%s", conn, batch)
+	defer glog.V(2).Infof("exit sendBatch(), dead=%d, num=%d", dead, num)
 	defer w.ReleaseConn(conn, dead)
 
 	err := websocket.JSON.Send(conn, batch)
