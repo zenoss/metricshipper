@@ -1,8 +1,8 @@
 package metricshipper
 
 import (
-	"github.com/zenoss/glog"
 	"github.com/imdario/mergo"
+	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
 
 	"io"
