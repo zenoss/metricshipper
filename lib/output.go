@@ -78,12 +78,12 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 		if w.retry_connection > 0 && attempts >= w.retry_connection {
 			break
 		}
-		if conn, dailerr := websocket.DialConfig(w.config); dailerr == nil {
+		if conn, dialerr := websocket.DialConfig(w.config); dialerr == nil {
 			glog.Info("Made connection to consumer")
 			w.conn <- conn
 			break
 		} else {
-			err = dailerr
+			err = dialerr
 			glog.Errorf("Error connecting to (%+v), attempt %d/%d: %s", w.config.Location, attempts, w.retry_connection, err)
 			time.Sleep(w.retry_connection_timeout * time.Second)
 		}
