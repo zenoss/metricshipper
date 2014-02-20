@@ -53,3 +53,11 @@
 # Number of processors to use.
 #
 #cpus: 4
+
+# Total retry attempts, zero for infinity
+#
+#retryconnection: 0
+
+# Timeout between connection retry attempts in seconds
+#
+#retryconnectiontimeout: 1

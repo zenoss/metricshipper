@@ -59,19 +59,26 @@ func startServer() {
 	log.Print("Test server listening on ", serverAddr)
 }
 
+func TestConnectFail(t *testing.T) {
+	pub, _ := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
+	if err := pub.Start(); err == nil {
+		t.Errorf("Unable to connect: %s", err)
+	}
+}
+
 func TestConnect(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, "admin", "zenoss")
-	if pub.Start() != nil {
-		t.Error("Unable to connect")
+	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
+	if err := pub.Start(); err != nil {
+		t.Error("Unable to connect: %s", err)
 	}
 }
 
 func TestPublishOne(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, "admin", "zenoss")
+	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
 	go pub.Start()
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)
@@ -81,7 +88,7 @@ func TestPublishOne(t *testing.T) {
 func TestHitBatchSize(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, "admin", "zenoss")
+	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, "admin", "zenoss")
 	go pub.Start()
 	stageMetrics(2, pub)
 	time.Sleep(5 * time.Millisecond)
@@ -94,7 +101,7 @@ func TestHitBatchSize(t *testing.T) {
 func TestHitBatchTimeout(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, "admin", "zenoss")
+	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, "admin", "zenoss")
 	go pub.Start()
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)

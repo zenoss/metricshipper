@@ -79,36 +79,60 @@ type RedisReader struct {
 }
 
 // Read a batch of metrics
-func (r *RedisReader) ReadBatch(conn redis.Conn) (count int) {
+func (r *RedisReader) ReadBatch(conn redis.Conn) int {
+	var count int
 	var rangeresult []string
-	// Read in a chunk of metrics up to the batch size
-	conn.Send("MULTI")
-	conn.Send("LRANGE", r.queue_name, 0, r.batch_size-1)
-	conn.Send("LTRIM", r.queue_name, r.batch_size, -1)
+	glog.V(2).Infof("enter RedisReader.ReadBatch( conn=%s)", conn)
+	defer glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%s) count=%d", conn, count)
+
+	// read redis values - Read in a chunk of metrics up to the batch size
+	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Sending Commands")
+	var send_err error
+	if send_err = conn.Send("MULTI"); send_err != nil {
+		glog.Errorf("Error sending command, multi: %s", send_err)
+	}
+
+	if send_err = conn.Send("LRANGE", r.queue_name, 0, r.batch_size-1); send_err != nil {
+		glog.Errorf("Error sending command, lrange: %s", send_err)
+	}
+
+	if send_err = conn.Send("LTRIM", r.queue_name, r.batch_size, -1); send_err != nil {
+		glog.Errorf("Error sending command, ltrim: %s", send_err)
+	}
+
+	//read redis values
+	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Reading Values")
 	values, err := redis.Values(conn.Do("EXEC"))
 	if err != nil {
-		glog.Error(err)
-		glog.Error("Error retrieving metric values")
+		glog.Errorf("Error retrieving metric values: %s", err)
 	}
+
+	//scan redis values
+	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Scanning Values")
 	if _, err := redis.Scan(values, &rangeresult); err != nil {
-		glog.Error("Error scanning metric values")
+		glog.Errorf("Error scanning metric values: %s", err)
 	}
 
 	// Else, deserialize each metric and shove it down the channel
+	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Parsing Values")
 	for _, m := range rangeresult {
 		met, err := MetricFromJSON([]byte(m))
 		if err != nil {
-			glog.Error("Invalid metric")
+			glog.Errorf("Invalid metric json: %s", err)
 		} else {
 			r.Incoming <- *met
 		}
 	}
-	return len(rangeresult)
+
+	count = len(rangeresult)
+	return count
 }
 
 // Drain the redis queue into the out channel until there's nothing left.
 func (r *RedisReader) Drain() {
 	conn := r.pool.Get()
+	glog.V(2).Infof("enter RedisReader.Drain()")
+	defer glog.V(2).Infof("exit RedisReader.Drain()")
 	defer conn.Close()
 	for {
 		count := r.ReadBatch(conn)
