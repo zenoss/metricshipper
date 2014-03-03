@@ -4,6 +4,7 @@ import (
 	"code.google.com/p/go.net/websocket"
 	"encoding/base64"
 	"github.com/zenoss/glog"
+	"strings"
 	"time"
 )
 
@@ -61,11 +62,12 @@ func (w *WebsocketPublisher) GetConn() *websocket.Conn {
 	return c
 }
 
-func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead bool) {
-	glog.V(2).Infof("enter ReleaseConn(), conn=%s, dead=%s", conn, dead)
-	defer glog.V(2).Infof("exit ReleaseConn(), conn=%s, dead=%d", conn, dead)
+func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead *bool) {
+	glog.V(2).Infof("enter ReleaseConn(), conn=%v, dead=%t", conn.Config().Location, *dead)
+	defer glog.V(2).Infof(" exit ReleaseConn(), conn=%v, dead=%t", conn.Config().Location, *dead)
 
-	if dead {
+	if *dead {
+		conn.Close()
 		w.AddConn()
 	} else {
 		w.conn <- conn
@@ -98,12 +100,12 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 }
 
 func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
-	glog.V(2).Infof("enter getBatch()")
+	glog.V(3).Infof("enter getBatch()")
 	buf := make([]Metric, 0)
 	batch := &MetricBatch{
 		Metrics: buf,
 	}
-	defer glog.V(2).Infof("exit getBatch(), len(buf)=%d, batch=%s", len(batch.Metrics), batch)
+	defer glog.V(3).Infof("exit getBatch(), len(buf)=%d", len(buf))
 
 	remaining := w.batch_size - len(buf)
 	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
@@ -122,22 +124,23 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
 
 func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
 	var num int
-	dead := false
+	var dead *bool = new(bool)
+	*dead = false
 	conn := w.GetConn()
-	glog.V(2).Infof("enter sendBatch(), conn=%s, batch=%s", conn, batch)
-	defer glog.V(2).Infof("exit sendBatch(), dead=%d, num=%d", dead, num)
+	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", conn.Config().Location, len(batch.Metrics))
+	defer glog.V(3).Infof("exit sendBatch(), dead=%t, num=%d", *dead, num)
 	defer w.ReleaseConn(conn, dead)
 
 	err := websocket.JSON.Send(conn, batch)
 	if err != nil {
-		dead = true
+		*dead = true
 		return num, err
 	}
 
 	num = len(batch.Metrics)
-	dead, err = w.readResponse(conn)
+	*dead, err = w.readResponse(conn)
 
-	return num, nil
+	return num, err
 }
 
 //read everything in the response buffer
@@ -151,10 +154,12 @@ func (w *WebsocketPublisher) readResponse(conn *websocket.Conn) (bool, error) {
 		err = conn.SetReadDeadline(deadline)
 
 		msg := make([]byte, 1024)
-		if n, err = conn.Read(msg); err != nil {
+		if n, err = conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
 			dead = true
 			break
 		}
+
+		err = nil
 		msg = msg[0:n]
 		if n == 0 {
 			break
