@@ -195,26 +195,26 @@ var drain int = 2
 
 // Start listening for metrics by polling the metric queue
 func (r *RedisReader) Subscribe() (err error) {
-  //spawn go routines and wait for them to stop
-  var complete sync.WaitGroup
+	//spawn go routines and wait for them to stop
+	var complete sync.WaitGroup
 	for i := 0; i < r.concurrency; i += 1 {
 		complete.Add(1)
 		go func() {
 			defer complete.Done()
-      //poll for data, then drain
-      for {
-        status, _err := r.poll()
-        if status == terminate {
-          err = _err
-          break
-        } else if status == drain {
-          r.Drain()
-        }
-      }
+			//poll for data, then drain
+			for {
+				status, _err := r.poll()
+				if status == terminate {
+					err = _err
+					break
+				} else if status == drain {
+					r.Drain()
+				}
+			}
 		}()
 	}
 	complete.Wait()
-  return nil
+	return nil
 
 	//for {
 	//	status, err := r.poll()
@@ -246,7 +246,7 @@ func (r *RedisReader) poll() (status int, err error) {
 		length, err := redis.Int(conn.Do("LLEN", r.queue_name))
 		if err != nil {
 			//TODO terminate logic
-      glog.Errorf( "Error \"LLEN {}\": {}", r.queue_name, err)
+			glog.Errorf("Error \"LLEN {}\": {}", r.queue_name, err)
 			return retry, err
 		}
 		if length > 0 {

@@ -17,9 +17,9 @@ func newReader(t *testing.T) *RedisReader {
 			IdleTimeout: 10,
 			Dial:        dial,
 		},
-		concurrency:  1,
-		batch_size:   10,
-		queue_name:   queue_name,
+		concurrency: 1,
+		batch_size:  10,
+		queue_name:  queue_name,
 	}
 	return r
 }
