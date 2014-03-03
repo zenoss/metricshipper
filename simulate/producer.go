@@ -55,9 +55,6 @@ func produce(client redis.Conn, channel, controlChannel string, total, batch int
 		if err := client.Send("LPUSH", message...); err != nil {
 			panic(fmt.Sprintf("Error sending metrics command, LPUSH: %s", err))
 		}
-		if err := client.Send("PUBLISH", controlChannel, 1); err != nil {
-			panic(fmt.Sprintf("Error sending control command, PUBLISH: %s", err))
-		}
 		if _, err := client.Do("EXEC"); err != nil {
 			panic(fmt.Sprintf("Error sending command, EXEC: %s", err))
 		}
