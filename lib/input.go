@@ -215,25 +215,6 @@ func (r *RedisReader) Subscribe() (err error) {
 	}
 	complete.Wait()
 	return nil
-
-	//for {
-	//	status, err := r.poll()
-	//	if status == terminate {
-	//		return err
-	//	} else if status == drain {
-	//		//start reading from the queue until reaching zero
-	//		var empty sync.WaitGroup
-	//		for i := 0; i < r.concurrency; i += 1 {
-	//			empty.Add(1)
-	//			go func() {
-	//				defer empty.Done()
-	//				r.Drain()
-	//			}()
-	//		}
-	//		empty.Wait()
-	//	}
-	//	//else status is a retry
-	//}
 }
 
 // poll the metrics list
