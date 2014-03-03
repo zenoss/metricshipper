@@ -48,15 +48,9 @@ func generate(channel string, size int) []interface{} {
 // write metrics to channel
 func produce(client redis.Conn, channel, controlChannel string, total, batch int) {
 	for i := 0; i < total; i += batch {
-		if err := client.Send("MULTI"); err != nil {
-			panic(fmt.Sprintf("Error sending metrics command, MULTI: %s", err))
-		}
 		message := generate(channel, batch)
-		if err := client.Send("LPUSH", message...); err != nil {
-			panic(fmt.Sprintf("Error sending metrics command, LPUSH: %s", err))
-		}
-		if _, err := client.Do("EXEC"); err != nil {
-			panic(fmt.Sprintf("Error sending command, EXEC: %s", err))
+		if _, err := client.Do("LPUSH", message...); err != nil {
+			panic(fmt.Sprintf("Error pushing metrics, LPUSH: %s", err))
 		}
 	}
 }
