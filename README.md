@@ -8,7 +8,7 @@ requires a redis server running in the background.
 
 1. Build
  make clean ; make
- cd simulate && build
+ cd simulate && go build
 
 2. Execute - Consumer
   ./simulate/simulate consumer
