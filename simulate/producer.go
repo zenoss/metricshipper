@@ -7,6 +7,8 @@ import (
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
 	metricshipper "github.com/zenoss/metricshipper/lib"
+	"math/rand"
+	"time"
 )
 
 // metric producer config parameters
@@ -37,8 +39,15 @@ func create_connection(uri string) (client redis.Conn, config *metricshipper.Red
 func generate(channel string, size int) []interface{} {
 	metrics := make([]interface{}, size+1)
 	metrics[0] = channel
+
+	gen := rand.New(rand.NewSource(time.Now().Unix()))
 	for i := 1; i < size+1; i += 1 {
 		metric := Metric{}
+		metric.Metric = fmt.Sprintf("metric-%d", i)
+		metric.Timestamp = int(time.Now().Unix())
+		metric.Value = gen.Float64()
+		metric.Tags = make(map[string]interface{})
+		metric.Tags["id"] = fmt.Sprintf("%d", i)
 		content, _ := json.Marshal(metric)
 		metrics[i] = content
 	}
