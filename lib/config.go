@@ -7,7 +7,7 @@ import (
 
 	"io"
 	"io/ioutil"
-	yaml "launchpad.net/goyaml"
+	"github.com/go-yaml/yaml"
 	"os"
 )
 
