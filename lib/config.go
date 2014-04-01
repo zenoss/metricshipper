@@ -5,9 +5,9 @@ import (
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
 
+	"gopkg.in/yaml.v1"
 	"io"
 	"io/ioutil"
-	"github.com/go-yaml/yaml"
 	"os"
 )
 
