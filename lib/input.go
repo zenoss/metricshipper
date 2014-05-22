@@ -3,6 +3,7 @@ package metricshipper
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
 	"net/url"
 	"strconv"
@@ -67,11 +68,12 @@ func DialFunc(config *RedisConnectionConfig) func() (redis.Conn, error) {
 
 // Reads metrics from redis
 type RedisReader struct {
-	Incoming    chan Metric
-	pool        *redis.Pool
-	concurrency int
-	batch_size  int
-	queue_name  string
+	Incoming      chan Metric
+	pool          *redis.Pool
+	concurrency   int
+	batch_size    int
+	queue_name    string
+	incomingMeter metrics.Meter
 }
 
 // Read a batch of metrics
@@ -120,7 +122,15 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 			glog.Errorf("Invalid metric json: %s", err)
 		} else {
 			r.Incoming <- *met
+			glog.V(3).Infof("METRIC INC %+v", *met)
 		}
+	}
+
+	// push internal metrics to incoming queue
+	r.incomingMeter.Mark(int64(len(rangeresult)))
+	internalMetrics := generateMeterMetrics(r.incomingMeter, "totalIncoming")
+	for _, met := range internalMetrics {
+		r.Incoming <- met
 	}
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
@@ -166,6 +176,10 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	if err != nil {
 		return nil, err
 	}
+
+	incomingMeter := metrics.NewMeter()
+	metrics.Register("incomingMeter", incomingMeter)
+
 	glog.Infoln("Connecting to redis server", config.Server())
 	glog.Infoln("Metrics database:", config.Database)
 	glog.Infoln("Metrics queue name:", config.Channel)
@@ -177,9 +191,10 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 			IdleTimeout: 240 * time.Second, // TODO: Configurable?
 			Dial:        DialFunc(config),
 		},
-		concurrency: concurrency,
-		batch_size:  batch_size,
-		queue_name:  config.Channel,
+		concurrency:   concurrency,
+		batch_size:    batch_size,
+		queue_name:    config.Channel,
+		incomingMeter: incomingMeter,
 	}
 	return reader, nil
 }
@@ -236,4 +251,34 @@ func (r *RedisReader) poll() (status int, err error) {
 
 		time.Sleep(1 * time.Second)
 	}
+}
+
+// generateMeterMetrics creates a slice of Metrics from a meter and name
+func generateMeterMetrics(meter metrics.Meter, infix string) []Metric {
+	prefix := fmt.Sprintf("ZEN_INF.org.zenoss.app.metricshipper.%s", infix)
+
+	metrics := []Metric{}
+	metrics = append(metrics, toMetric(fmt.Sprintf("%s.count", prefix), float64(meter.Count())))
+	metrics = append(metrics, toMetric(fmt.Sprintf("%s.1MinuteRate", prefix), meter.Rate1()))
+	metrics = append(metrics, toMetric(fmt.Sprintf("%s.5MinuteRate", prefix), meter.Rate5()))
+	metrics = append(metrics, toMetric(fmt.Sprintf("%s.15MinuteRate", prefix), meter.Rate15()))
+	metrics = append(metrics, toMetric(fmt.Sprintf("%s.meanRate", prefix), meter.RateMean()))
+
+	if glog.V(3) {
+		for _, met := range metrics {
+			glog.Infof("METRIC INT %+v", met)
+		}
+	}
+
+	return metrics
+}
+
+// toMetric creates a Metric from a name and value
+func toMetric(name string, value float64) Metric {
+	metric := Metric{}
+	metric.Metric = name
+	metric.Timestamp = float64(time.Now().Unix())
+	metric.Value = value
+	metric.Tags = make(map[string]interface{})
+	return metric
 }
