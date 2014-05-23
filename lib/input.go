@@ -73,7 +73,7 @@ type RedisReader struct {
 	concurrency   int
 	batch_size    int
 	queue_name    string
-	incomingMeter metrics.Meter
+	IncomingMeter metrics.Meter // no need to lock since metrics.Meter already does that
 }
 
 // Read a batch of metrics
@@ -127,11 +127,7 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	}
 
 	// push internal metrics to incoming queue
-	r.incomingMeter.Mark(int64(len(rangeresult)))
-	internalMetrics := generateMeterMetrics(r.incomingMeter, "totalIncoming")
-	for _, met := range internalMetrics {
-		r.Incoming <- met
-	}
+	r.IncomingMeter.Mark(int64(len(rangeresult)))
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
 	return len(rangeresult)
@@ -194,7 +190,7 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 		concurrency:   concurrency,
 		batch_size:    batch_size,
 		queue_name:    config.Channel,
-		incomingMeter: incomingMeter,
+		IncomingMeter: incomingMeter,
 	}
 	return reader, nil
 }
@@ -251,34 +247,4 @@ func (r *RedisReader) poll() (status int, err error) {
 
 		time.Sleep(1 * time.Second)
 	}
-}
-
-// generateMeterMetrics creates a slice of Metrics from a meter and name
-func generateMeterMetrics(meter metrics.Meter, infix string) []Metric {
-	prefix := fmt.Sprintf("ZEN_INF.org.zenoss.app.metricshipper.%s", infix)
-
-	metrics := []Metric{}
-	metrics = append(metrics, toMetric(fmt.Sprintf("%s.count", prefix), float64(meter.Count())))
-	metrics = append(metrics, toMetric(fmt.Sprintf("%s.1MinuteRate", prefix), meter.Rate1()))
-	metrics = append(metrics, toMetric(fmt.Sprintf("%s.5MinuteRate", prefix), meter.Rate5()))
-	metrics = append(metrics, toMetric(fmt.Sprintf("%s.15MinuteRate", prefix), meter.Rate15()))
-	metrics = append(metrics, toMetric(fmt.Sprintf("%s.meanRate", prefix), meter.RateMean()))
-
-	if glog.V(3) {
-		for _, met := range metrics {
-			glog.Infof("METRIC INT %+v", met)
-		}
-	}
-
-	return metrics
-}
-
-// toMetric creates a Metric from a name and value
-func toMetric(name string, value float64) Metric {
-	metric := Metric{}
-	metric.Metric = name
-	metric.Timestamp = float64(time.Now().Unix())
-	metric.Value = value
-	metric.Tags = make(map[string]interface{})
-	return metric
 }

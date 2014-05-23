@@ -74,6 +74,15 @@ func main() {
 	}
 	go p.Start()
 
+	// Create a stats reporter and start it
+	glog.Info("Warming up the stats reporter")
+	s := &metricshipper.MetricStats{
+		MetricsChannel: &r.Incoming,
+		IncomingMeter:  &r.IncomingMeter,
+		// OutgoingMeter: &w.OutgoingMeter,
+	}
+	go s.Start()
+
 	// Finally, open the Redis floodgates (also manages own goroutines)
 	glog.Info("Subscribing to metrics queue")
 	r.Subscribe()
