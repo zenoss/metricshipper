@@ -3,6 +3,7 @@ package metricshipper
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
 	"net/url"
 	"strconv"
@@ -67,11 +68,12 @@ func DialFunc(config *RedisConnectionConfig) func() (redis.Conn, error) {
 
 // Reads metrics from redis
 type RedisReader struct {
-	Incoming    chan Metric
-	pool        *redis.Pool
-	concurrency int
-	batch_size  int
-	queue_name  string
+	Incoming      chan Metric
+	pool          *redis.Pool
+	concurrency   int
+	batch_size    int
+	queue_name    string
+	IncomingMeter metrics.Meter // no need to lock since metrics.Meter already does that
 }
 
 // Read a batch of metrics
@@ -120,8 +122,12 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 			glog.Errorf("Invalid metric json: %s", err)
 		} else {
 			r.Incoming <- *met
+			glog.V(3).Infof("METRIC INC %+v", *met)
 		}
 	}
+
+	// update meter with number of metrics read
+	r.IncomingMeter.Mark(int64(len(rangeresult)))
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
 	return len(rangeresult)
@@ -166,6 +172,10 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	if err != nil {
 		return nil, err
 	}
+
+	incomingMeter := metrics.NewMeter()
+	metrics.Register("incomingMeter", incomingMeter)
+
 	glog.Infoln("Connecting to redis server", config.Server())
 	glog.Infoln("Metrics database:", config.Database)
 	glog.Infoln("Metrics queue name:", config.Channel)
@@ -177,9 +187,10 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 			IdleTimeout: 240 * time.Second, // TODO: Configurable?
 			Dial:        DialFunc(config),
 		},
-		concurrency: concurrency,
-		batch_size:  batch_size,
-		queue_name:  config.Channel,
+		concurrency:   concurrency,
+		batch_size:    batch_size,
+		queue_name:    config.Channel,
+		IncomingMeter: incomingMeter,
 	}
 	return reader, nil
 }

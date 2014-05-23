@@ -3,6 +3,7 @@ package metricshipper
 import (
 	"code.google.com/p/go.net/websocket"
 	"encoding/base64"
+	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ type WebsocketPublisher struct {
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
+	OutgoingMeter            metrics.Meter // no need to lock since metrics.Meter already does that
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
@@ -35,6 +37,9 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	str := base64.StdEncoding.EncodeToString(data)
 	config.Header.Add("Authorization", "basic "+str)
 
+	outgoingMeter := metrics.NewMeter()
+	metrics.Register("outgoingMeter", outgoingMeter)
+
 	return &WebsocketPublisher{
 		config:                   config,
 		concurrency:              concurrency,
@@ -44,6 +49,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
+		OutgoingMeter:            outgoingMeter,
 	}, nil
 }
 
@@ -180,6 +186,10 @@ func (w *WebsocketPublisher) DoBatch() {
 				sent, err := w.sendBatch(batch)
 				if err == nil {
 					glog.V(2).Infof("Sent %d metrics to the consumer.", sent)
+
+					// update meter with number of metrics sent
+					w.OutgoingMeter.Mark(int64(sent))
+
 					break
 				} else {
 					glog.Errorf("Failed sending %d metrics to the consumer: %s", num, err)
