@@ -80,6 +80,7 @@ func main() {
 		MetricsChannel: &r.Incoming,
 		IncomingMeter:  &r.IncomingMeter,
 		OutgoingMeter:  &w.OutgoingMeter,
+		StatsInterval:  config.StatsInterval,
 	}
 	go s.Start()
 

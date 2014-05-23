@@ -12,6 +12,7 @@ type MetricStats struct {
 	MetricsChannel *chan Metric
 	IncomingMeter  *metrics.Meter
 	OutgoingMeter  *metrics.Meter
+	StatsInterval  int
 }
 
 // Start starts the stats publishing/reporting
@@ -21,7 +22,7 @@ func (ms *MetricStats) Start() {
 		for {
 			ms.PublishInternalMetrics()
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Duration(ms.StatsInterval) * time.Second)
 		}
 	}()
 }
@@ -35,7 +36,7 @@ func (ms *MetricStats) PublishInternalMetrics() {
 	// report internal metrics
 	for _, met := range metrics {
 		*ms.MetricsChannel <- met
-		if glog.V(2) {
+		if glog.V(3) {
 			glog.Infof("METRIC INT %+v", met)
 		}
 	}
@@ -52,7 +53,7 @@ func generateMeterMetrics(meter *metrics.Meter, infix string) []Metric {
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.5MinuteRate", prefix), (*meter).Rate5()))
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.15MinuteRate", prefix), (*meter).Rate15()))
 
-	glog.Infof("INTERNAL %s: %10.0f %9.1f/s %8.1f/1m %8.1f/5m %8.1f/15m",
+	glog.V(1).Infof("INTERNAL %s: %10.0f %9.1f/s %8.1f/1m %8.1f/5m %8.1f/15m",
 		infix, metrics[0].Value, metrics[1].Value, metrics[2].Value, metrics[3].Value, metrics[4].Value)
 
 	return metrics
