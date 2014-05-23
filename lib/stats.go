@@ -40,6 +40,10 @@ func (ms *MetricStats) PublishInternalMetrics() {
 			glog.Infof("METRIC INT %+v", met)
 		}
 	}
+
+	// update incoming meter with number of metrics to match outgoing since
+	// we are injecting these metrics onto the incoming queue
+	(*ms.IncomingMeter).Mark(int64(len(metrics)))
 }
 
 // generateMeterMetrics creates a slice of Metrics from a meter and name
