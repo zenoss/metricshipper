@@ -126,7 +126,7 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 		}
 	}
 
-	// push internal metrics to incoming queue
+	// update meter with number of metrics read
 	r.IncomingMeter.Mark(int64(len(rangeresult)))
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))

@@ -31,15 +31,17 @@ func (ms *MetricStats) PublishInternalMetrics() {
 	glog.V(2).Infof("enter MetricStats.PublishInternalMetrics()")
 	defer glog.V(2).Infof("exit MetricStats.PublishInternalMetrics()")
 
-	incomingMetrics := generateMeterMetrics(ms.IncomingMeter, "totalIncoming")
-	for _, met := range incomingMetrics {
+	metrics := []Metric{}
+	metrics = append(metrics, generateMeterMetrics(ms.IncomingMeter, "totalIncoming")...)
+	metrics = append(metrics, generateMeterMetrics(ms.OutgoingMeter, "totalOutgoing")...)
+
+	// report internal metrics
+	for _, met := range metrics {
 		*ms.MetricsChannel <- met
 		if glog.V(1) {
 			glog.Infof("METRIC INT %+v", met)
 		}
 	}
-
-	// TODO: report outgoing metrics
 }
 
 // generateMeterMetrics creates a slice of Metrics from a meter and name

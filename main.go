@@ -79,7 +79,7 @@ func main() {
 	s := &metricshipper.MetricStats{
 		MetricsChannel: &r.Incoming,
 		IncomingMeter:  &r.IncomingMeter,
-		// OutgoingMeter: &w.OutgoingMeter,
+		OutgoingMeter:  &w.OutgoingMeter,
 	}
 	go s.Start()
 
