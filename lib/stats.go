@@ -28,9 +28,6 @@ func (ms *MetricStats) Start() {
 
 // PublishInternalMetrics publishes internal metrics
 func (ms *MetricStats) PublishInternalMetrics() {
-	glog.V(2).Infof("enter MetricStats.PublishInternalMetrics()")
-	defer glog.V(2).Infof("exit MetricStats.PublishInternalMetrics()")
-
 	metrics := []Metric{}
 	metrics = append(metrics, generateMeterMetrics(ms.IncomingMeter, "totalIncoming")...)
 	metrics = append(metrics, generateMeterMetrics(ms.OutgoingMeter, "totalOutgoing")...)
@@ -38,7 +35,7 @@ func (ms *MetricStats) PublishInternalMetrics() {
 	// report internal metrics
 	for _, met := range metrics {
 		*ms.MetricsChannel <- met
-		if glog.V(1) {
+		if glog.V(2) {
 			glog.Infof("METRIC INT %+v", met)
 		}
 	}
@@ -54,6 +51,9 @@ func generateMeterMetrics(meter *metrics.Meter, infix string) []Metric {
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.1MinuteRate", prefix), (*meter).Rate1()))
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.5MinuteRate", prefix), (*meter).Rate5()))
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.15MinuteRate", prefix), (*meter).Rate15()))
+
+	glog.Infof("INTERNAL %s: %10.0f %9.1f/s %8.1f/1m %8.1f/5m %8.1f/15m",
+		infix, metrics[0].Value, metrics[1].Value, metrics[2].Value, metrics[3].Value, metrics[4].Value)
 
 	return metrics
 }
