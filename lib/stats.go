@@ -45,6 +45,12 @@ func (ms *MetricStats) PublishInternalMetrics() {
 	metrics = append(metrics, generateMeterMetrics(ms.IncomingMeter, "totalIncoming", ms.tags)...)
 	metrics = append(metrics, generateMeterMetrics(ms.OutgoingMeter, "totalOutgoing", ms.tags)...)
 
+	// set all timestamps to be the same as the first item
+	timestamp := metrics[0].Timestamp
+	for ii, _ := range metrics {
+		metrics[ii].Timestamp = timestamp
+	}
+
 	// update incoming meter with number of metrics to match outgoing since
 	// we are injecting these metrics onto the incoming queue
 	(*ms.IncomingMeter).Mark(int64(len(metrics)))
