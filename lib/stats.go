@@ -26,7 +26,13 @@ type MetricStats struct {
 // Start starts the stats publishing/reporting
 func (ms *MetricStats) Start() {
 	ms.tags = make(map[string]interface{})
-	ms.tags["host"] = os.Getenv("CONTROLPLANE_HOST_ID")
+	host, err := os.Hostname()
+	if err != nil {
+		glog.Errorf("unable to get hostname: %s", err)
+	}
+	ms.tags["host"] = host
+	ms.tags["daemon"] = "Shipper"
+	ms.tags["internal"] = "true"
 
 	// publish every second
 	go func() {
@@ -99,6 +105,8 @@ func (ms *MetricStats) PublishInternalMetrics() {
 			glog.Errorf("%s", err)
 			return
 		}
+	} else {
+		glog.Warningf("not posting stats to control plane - stats url is not set")
 	}
 }
 
