@@ -28,9 +28,11 @@ func (ms *MetricStats) Start() {
 	ms.tags = make(map[string]interface{})
 	host, err := os.Hostname()
 	if err != nil {
-		glog.Errorf("unable to get hostname: %s", err)
+		glog.Errorf("unable to get hostname: %s - setting 'host' to 'UNKNOWN'", err)
+		ms.tags["host"] = "UNKNOWN"
+	} else {
+		ms.tags["host"] = host
 	}
-	ms.tags["host"] = host
 	ms.tags["daemon"] = "Shipper"
 	ms.tags["internal"] = "true"
 
