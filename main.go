@@ -77,10 +77,11 @@ func main() {
 	// Create a stats reporter and start it
 	glog.Info("Warming up the stats reporter")
 	s := &metricshipper.MetricStats{
-		MetricsChannel: &r.Incoming,
-		IncomingMeter:  &r.IncomingMeter,
-		OutgoingMeter:  &w.OutgoingMeter,
-		StatsInterval:  config.StatsInterval,
+		MetricsChannel:       &r.Incoming,
+		IncomingMeter:        &r.IncomingMeter,
+		OutgoingMeter:        &w.OutgoingMeter,
+		StatsInterval:        config.StatsInterval,
+		ControlPlaneStatsURL: os.Getenv("CONTROLPLANE_CONSUMER_URL"),
 	}
 	go s.Start()
 
