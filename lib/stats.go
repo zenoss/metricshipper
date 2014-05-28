@@ -123,7 +123,7 @@ func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]in
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.5MinuteRate", prefix), (*meter).Rate5(), tags))
 	metrics = append(metrics, toMetric(fmt.Sprintf("%s.15MinuteRate", prefix), (*meter).Rate15(), tags))
 
-	glog.V(1).Infof("INTERNAL %s: %10.0f %9.1f/s %8.1f/1m %8.1f/5m %8.1f/15m",
+	glog.Infof("INTERNAL %s: %10.0f %9.1f/s %8.1f/1m %8.1f/5m %8.1f/15m",
 		infix, metrics[0].Value, metrics[1].Value, metrics[2].Value, metrics[3].Value, metrics[4].Value)
 
 	return metrics
