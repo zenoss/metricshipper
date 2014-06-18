@@ -2,14 +2,15 @@ package metricshipper
 
 import (
 	"fmt"
-	"github.com/garyburd/redigo/redis"
-	"github.com/rcrowley/go-metrics"
-	"github.com/zenoss/glog"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/rcrowley/go-metrics"
+	"github.com/zenoss/glog"
 )
 
 type RedisConnectionConfig struct {
@@ -114,20 +115,22 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 		return -1
 	}
 
+	var validmetric_count int64
 	// Else, deserialize each metric and shove it down the channel
 	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Parsing Values")
 	for _, m := range rangeresult {
 		met, err := MetricFromJSON([]byte(m))
 		if err != nil {
-			glog.Errorf("Invalid metric json: %s", err)
+			glog.Errorf("Invalid metric json: %+v %s", m, err)
 		} else {
 			r.Incoming <- *met
+			validmetric_count++
 			glog.V(3).Infof("METRIC INC %+v", *met)
 		}
 	}
 
 	// update meter with number of metrics read
-	r.IncomingMeter.Mark(int64(len(rangeresult)))
+	r.IncomingMeter.Mark(validmetric_count)
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
 	return len(rangeresult)
@@ -151,7 +154,6 @@ func (r *RedisReader) Drain() {
 					done = true
 					break
 				}
-
 				// there was an error pulling data, create a new connection
 				if count < 0 {
 					break
@@ -195,18 +197,9 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	return reader, nil
 }
 
-// terminate subscription
-var terminate int = 0
-
-// retry polling
-var retry int = 1
-
-// data's available, start draining
-var drain int = 2
-
 // Start listening for metrics by polling the metric queue
-func (r *RedisReader) Subscribe() (err error) {
-	//spawn go routines and wait for them to stop
+func (r *RedisReader) Subscribe() {
+	// spawn go routines and wait for them to stop
 	var complete sync.WaitGroup
 	for i := 0; i < r.concurrency; i += 1 {
 		complete.Add(1)
@@ -214,37 +207,10 @@ func (r *RedisReader) Subscribe() (err error) {
 			defer complete.Done()
 			//poll for data, then drain
 			for {
-				status, _err := r.poll()
-				if status == terminate {
-					err = _err
-					break
-				} else if status == drain {
-					r.Drain()
-				}
+				r.Drain()
+				time.Sleep(1 * time.Second)
 			}
 		}()
 	}
 	complete.Wait()
-	return nil
-}
-
-// poll the metrics list
-func (r *RedisReader) poll() (status int, err error) {
-	conn := r.pool.Get()
-	defer conn.Close()
-
-	// loop until data exists
-	for {
-		length, err := redis.Int(conn.Do("LLEN", r.queue_name))
-		if err != nil {
-			//TODO terminate logic
-			glog.Errorf("Error \"LLEN {}\": {}", r.queue_name, err)
-			return retry, err
-		}
-		if length > 0 {
-			return drain, nil
-		}
-
-		time.Sleep(1 * time.Second)
-	}
 }
