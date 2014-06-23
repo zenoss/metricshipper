@@ -21,7 +21,7 @@ install: output/metricshipper
 	@install -m 644 etc/supervisord.conf $(PREFIX)/etc/metricshipper/supervisord.conf
 	@ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor || echo "Supervisor config already exists"
 
-test: 
+test:
 	@go get
 	@go test $(PACKAGE)/lib
 	@go test $(PACKAGE)

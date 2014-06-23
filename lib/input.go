@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/rcrowley/go-metrics"
+	metrics "github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
 )
 
@@ -91,13 +91,13 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	}
 
 	//read from end of list (oldest values)
-	if send_err = (*conn).Send("LRANGE", r.queue_name, r.batch_size, -1); send_err != nil {
+	if send_err = (*conn).Send("LRANGE", r.queue_name, -r.batch_size, -1); send_err != nil {
 		glog.Errorf("Error sending command, lrange: %s", send_err)
 		return -1
 	}
 
 	//trim keeps newest values (values not yet read)
-	if send_err = (*conn).Send("LTRIM", r.queue_name, 0, r.batch_size-1); send_err != nil {
+	if send_err = (*conn).Send("LTRIM", r.queue_name, 0, -r.batch_size-1); send_err != nil {
 		glog.Errorf("Error sending command, ltrim: %s", send_err)
 		return -1
 	}
