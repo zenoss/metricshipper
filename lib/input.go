@@ -90,12 +90,14 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 		return -1
 	}
 
-	if send_err = (*conn).Send("LRANGE", r.queue_name, 0, r.batch_size-1); send_err != nil {
+	//read from end of list (oldest values)
+	if send_err = (*conn).Send("LRANGE", r.queue_name, r.batch_size, -1); send_err != nil {
 		glog.Errorf("Error sending command, lrange: %s", send_err)
 		return -1
 	}
 
-	if send_err = (*conn).Send("LTRIM", r.queue_name, r.batch_size, -1); send_err != nil {
+	//trim keeps newest values (values not yet read)
+	if send_err = (*conn).Send("LTRIM", r.queue_name, 0, r.batch_size-1); send_err != nil {
 		glog.Errorf("Error sending command, ltrim: %s", send_err)
 		return -1
 	}
