@@ -2,11 +2,12 @@ package metricshipper
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
-	"github.com/rcrowley/go-metrics"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 var queue_name string = "metrics"
@@ -57,8 +58,8 @@ func dial() (redis.Conn, error) {
 	return testConn{c}, nil
 }
 
-func sendone(conn redis.Conn) {
-	m := &Metric{}
+func sendone(metric string, conn redis.Conn) {
+	m := &Metric{Metric: metric}
 	s, _ := json.Marshal(m)
 	conn.Send("RPUSH", queue_name, s)
 }
@@ -86,22 +87,33 @@ func TestParseRedisUri(t *testing.T) {
 }
 
 func TestReadBatch(t *testing.T) {
+	mLen := 3
+	mBatch := 2
 	reader := newReader(t)
-	reader.batch_size = 2
+	reader.batch_size = mBatch
 	conn := reader.pool.Get()
 	defer conn.Close()
 	defer conn.Do("DEL", queue_name)
-	for i := 0; i < 3; i++ {
-		sendone(conn)
+	for i := 0; i < mLen; i++ {
+		sendone(strconv.Itoa(i), conn)
 	}
+	conn.Flush()
 	reader.ReadBatch(&conn)
 	close(reader.Incoming)
 	seen := make([]interface{}, 0)
 	for m := range reader.Incoming {
 		seen = append(seen, m)
 	}
-	if len(seen) != 2 {
-		t.Error("Did not read the correct batch size")
+	if len(seen) != mBatch {
+		t.Errorf("Did not read the correct batch size, expected 2 got %s", len(seen))
+	}
+
+	metrics, err := readMetrics(conn)
+	if err != nil {
+		t.Errorf("error reading metrics %v", err)
+	}
+	if len(metrics) != mLen-mBatch {
+		t.Errorf("expected %v got %v", mLen-mBatch, len(metrics))
 	}
 	reader.Incoming = make(chan Metric, 20)
 	reader.ReadBatch(&conn)
@@ -110,8 +122,28 @@ func TestReadBatch(t *testing.T) {
 		seen = append(seen, m)
 	}
 	if len(seen) != 3 {
-		t.Error("Did not read the correct batch size")
+		t.Errorf("Did not read the correct batch size, expected 3 got %s", len(seen))
 	}
+
+}
+
+func readMetrics(conn redis.Conn) ([]*Metric, error) {
+	var metrics []*Metric
+	conn.Send("LRANGE", queue_name, 0, 100) // read everything
+	conn.Flush()
+	json, err := redis.Strings(conn.Receive())
+	if err != nil {
+		return metrics, err
+	}
+	for _, x := range json {
+		met, err := MetricFromJSON([]byte(x))
+		if err != nil {
+			return metrics, err
+		}
+		metrics = append(metrics, met)
+	}
+
+	return metrics, nil
 
 }
 
@@ -122,17 +154,17 @@ func TestHandleNilMetric(t *testing.T) {
 	defer conn.Close()
 	defer conn.Do("DEL", queue_name)
 
+	// Send another batch of valid
+	sendone("1", conn)
+	sendone("2", conn)
+	sendone("3", conn)
+
 	// Send a nil
 	conn.Send("RPUSH", queue_name, nil)
 	// Send something valid
-	sendone(conn)
+	sendone("4", conn)
 	// Send another nil
 	conn.Send("RPUSH", queue_name, nil)
-
-	// Send another batch of valid
-	sendone(conn)
-	sendone(conn)
-	sendone(conn)
 
 	reader.ReadBatch(&conn)
 	close(reader.Incoming)
@@ -142,7 +174,7 @@ func TestHandleNilMetric(t *testing.T) {
 		seen = append(seen, m)
 	}
 	if len(seen) != 1 {
-		t.Error("Did not handle a nil metric correctly")
+		t.Errorf("Did not handle a nil metric correctly, expected 1, got %v : %#v", len(seen), seen)
 	}
 
 	reader.Incoming = make(chan Metric, 20)
@@ -168,17 +200,17 @@ func TestInvalidMetric(t *testing.T) {
 	s, _ := json.Marshal(m)
 	s = []byte(string(s) + "INVALID_JSON")
 
+	// Send another batch of valid
+	sendone("1", conn)
+	sendone("2", conn)
+	sendone("3", conn)
+
 	// Send invalid JSON
 	conn.Send("RPUSH", queue_name, s)
 	// Send something valid
-	sendone(conn)
+	sendone("4", conn)
 	// Send more invalid JSON
 	conn.Send("RPUSH", queue_name, s)
-
-	// Send another batch of valid
-	sendone(conn)
-	sendone(conn)
-	sendone(conn)
 
 	reader.ReadBatch(&conn)
 	close(reader.Incoming)
@@ -211,7 +243,7 @@ func TestDrain(t *testing.T) {
 	defer conn.Do("DEL", queue_name)
 	conn.Do("DEL", queue_name)
 	for i := 0; i < 10; i++ {
-		sendone(conn)
+		sendone(strconv.Itoa(i), conn)
 	}
 	conn.Flush()
 	reader.Drain()
@@ -237,7 +269,7 @@ func TestSubscribe(t *testing.T) {
 	defer conn.Do("DEL", queue_name)
 	conn.Do("DEL", queue_name)
 	for i := 0; i < 10; i++ {
-		sendone(conn)
+		sendone(strconv.Itoa(i), conn)
 	}
 	conn.Flush()
 	llen, _ := redis.Int(conn.Do("LLEN", queue_name))
