@@ -1,4 +1,4 @@
-PREFIX ?= $ZENHOME
+PREFIX ?= $(ZENHOME)
 PACKAGE=github.com/zenoss/metricshipper
 
 
