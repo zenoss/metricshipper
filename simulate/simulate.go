@@ -23,7 +23,10 @@ func main() {
 	} else if command == "consumer" {
 		glog.Infof("Simulating consumer")
 		consumer(os.Args[1:])
+	} else if command == "perfproducer" {
+		glog.Infof("Simulating perfproducer")
+		perfproducer(os.Args[1:])
 	} else {
-		glog.Errorf("Illegal simulate arguments %s, expected: (producer or consumer)", command)
+		glog.Errorf("Illegal simulate arguments %s, expected: (producer or consumer or perfproducer)", command)
 	}
 }
