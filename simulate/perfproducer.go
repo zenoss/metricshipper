@@ -83,20 +83,20 @@ func perfproduce(client redis.Conn, channel, controlChannel string, totalDevices
 			panic(fmt.Sprintf("Error pushing metrics, LPUSH: %s", err))
 		}
 		if i%1000 == 0 {
-			fmt.Printf("Sent metrics for device #%d to redis.\n", i+1)
+			glog.Infof("Sent metrics for device #%d to redis.\n", i+1)
 		}
 	}
-	fmt.Printf("Sent metrics for %d devices to redis.\n", totalDevices)
+	glog.Infof("Sent metrics for %d devices to redis.\n", totalDevices)
 	endtime := int(time.Now().Unix())
 	// duration in secs
 	duration := endtime - starttime
 
 	if duration < interval {
-		fmt.Printf("sleep for %d seconds\n", interval-duration)
+		glog.Infof("sleep for %d seconds\n", interval-duration)
 		sleepDuration := time.Duration(interval - duration)
 		time.Sleep(sleepDuration * time.Second)
 	}
-	fmt.Println("Woke up")
+	glog.Infof("Woke up")
 }
 
 // faux producer
@@ -109,17 +109,17 @@ func perfproducer(args []string) {
 	client, redisConfig, err := create_connection(config.RedisUri)
 	if err != nil {
 		glog.Errorf("Failed opening redis uri: %s -> %s", config.RedisUri, err)
-		fmt.Printf("%s\n", `Try using different uri:
+		glog.Infof("%s\n", `Try using different uri:
 	port=$(docker ps --no-trunc|awk '/redis-server/{print;exit}'|egrep -o '[[:digit:]]+->6379/tcp'|cut -f1 -d-);
 	echo redis port to use is: $port
 	./simulate perfproducer -u redis://$(uname -n):$port/0/metrics`)
 		return
 	}
 
-	fmt.Printf("Number of Devices:%d  Components per Device:%d  Collection Interval(s):%d Producing Duration(min):%d\n", config.Devices, config.Components, config.CollInterval, config.Duration)
+	glog.Infof("Number of Devices:%d  Components per Device:%d  Collection Interval(s):%d Producing Duration(min):%d\n", config.Devices, config.Components, config.CollInterval, config.Duration)
 	iterations := config.Duration * 60 / config.CollInterval
 	for i := 0; i < iterations; i++ {
-		fmt.Printf("Iteration Number: %d\n", i+1)
+		glog.Infof("Iteration Number: %d\n", i+1)
 		perfproduce(client, redisConfig.Channel, redisConfig.Channel+"-control", config.Devices, config.Components, config.CollInterval, config.Prefix)
 	}
 }
