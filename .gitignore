@@ -26,3 +26,5 @@ output
 simulate/simulate
 metricd/metricd
 coverage.out
+
+*.Godeps_restored
