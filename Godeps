@@ -1,0 +1,37 @@
+{
+	"ImportPath": "github.com/zenoss/metricshipper",
+	"GoVersion": "go1.3",
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/go.net/websocket",
+			"Comment": "null-139",
+			"Rev": "98fd1f5506373df1033b67a1881078705456e2ee"
+		},
+		{
+			"ImportPath": "github.com/garyburd/redigo/redis",
+			"Rev": "6628c86d6a89ce7983c7c9b5e98c1df795fbd256"
+		},
+		{
+			"ImportPath": "github.com/imdario/mergo",
+			"Comment": "0.1.3-7-ge1856b2",
+			"Rev": "e1856b2128eb93453caf1f21d4f1d9926ebeb593"
+		},
+		{
+			"ImportPath": "github.com/rcrowley/go-metrics",
+			"Rev": "6ffbdf30ba7072d9f9e2afe57ad651a75a544a83"
+		},
+		{
+			"ImportPath": "github.com/zenoss/glog",
+			"Rev": "73e8a1c4e8cc8688ef84ccea341f2041fa2ecf72"
+		},
+		{
+			"ImportPath": "github.com/zenoss/go-flags",
+			"Comment": "v1-113-ga568482",
+			"Rev": "a568482c3ff4d995fa3e3e0fa54f5bd1548a88b9"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v1",
+			"Rev": "1b9791953ba4027efaeb728c7355e542a203be5e"
+		}
+	]
+}
