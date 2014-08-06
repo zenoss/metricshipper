@@ -20,7 +20,7 @@ PACKAGE=github.com/zenoss/metricshipper
 # $GOPATH/src.  It may be useful to periodically audit the checked-in Godeps
 # against the generated Godeps.
 #------------------------------------------------------------------------------#
-GODEP     = $(GOBIN)/godep
+GODEP     = $(GOPATH)/bin/godep
 Godeps    = Godeps
 godep_SRC = github.com/tools/godep
 
@@ -65,7 +65,7 @@ $(GODEP): | $(missing_godep_SRC)
 
 output/metricshipper: $(Godeps_restored)
 	@go get
-	@mkdir output
+	@mkdir -p output
 	@cd output && go build $(PACKAGE)
 
 devinstall: output/metricshipper
