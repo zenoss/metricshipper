@@ -20,7 +20,16 @@ PACKAGE=github.com/zenoss/metricshipper
 # $GOPATH/src.  It may be useful to periodically audit the checked-in Godeps
 # against the generated Godeps.
 #------------------------------------------------------------------------------#
-GODEP     = $(GOPATH)/bin/godep
+
+ifeq "$(GOPATH)" ""
+    $(warning "GOPATH not set. Ok to ignore for containerized builds.")
+else
+    GOSRC = $(GOPATH)/src
+    GOBIN = $(GOPATH)/bin
+    GOPKG = $(GOPATH)/pkg
+endif
+
+GODEP     = $(GOBIN)/godep
 Godeps    = Godeps
 godep_SRC = github.com/tools/godep
 
@@ -35,7 +44,7 @@ default: build
 build: output/metricshipper
 
 $(Godeps_restored): $(GODEP) $(Godeps)
-	@echo "$(GODEP) restore" ;\
+	echo "$(GODEP) restore" ;\
 	$(GODEP) restore ;\
 	rc=$$? ;\
 	if [ $${rc} -ne 0 ] ; then \
@@ -61,24 +70,24 @@ $(GOSRC)/$(godep_SRC):
 #
 missing_godep_SRC = $(filter-out $(wildcard $(GOSRC)/$(godep_SRC)), $(GOSRC)/$(godep_SRC))
 $(GODEP): | $(missing_godep_SRC)
+	echo go install
 	go install $(godep_SRC)
 
 output/metricshipper: $(Godeps_restored)
-	@go get
-	@mkdir -p output
-	@cd output && go build $(PACKAGE)
+	mkdir -p output
+	cd output && go build $(PACKAGE)
 
 devinstall: output/metricshipper
-	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
+	install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
 
 .PHONY: install
 install: output/metricshipper
-	@mkdir -p $(PREFIX)/etc/supervisor $(PREFIX)/bin $(PREFIX)/etc/metricshipper
-	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
-	@install -m 644 etc/metricshipper.yaml $(PREFIX)/etc/metricshipper/metricshipper.yaml
-	@install -m 644 etc/metricshipper_supervisor.conf $(PREFIX)/etc/metricshipper/metricshipper_supervisor.conf
-	@install -m 644 etc/supervisord.conf $(PREFIX)/etc/metricshipper/supervisord.conf
-	@ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor || echo "Supervisor config already exists"
+	mkdir -p $(PREFIX)/etc/supervisor $(PREFIX)/bin $(PREFIX)/etc/metricshipper
+	install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
+	install -m 644 etc/metricshipper.yaml $(PREFIX)/etc/metricshipper/metricshipper.yaml
+	install -m 644 etc/metricshipper_supervisor.conf $(PREFIX)/etc/metricshipper/metricshipper_supervisor.conf
+	install -m 644 etc/supervisord.conf $(PREFIX)/etc/metricshipper/supervisord.conf
+	ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor || echo "Supervisor config already exists"
 
 .PHONY: test
 test:
@@ -102,7 +111,7 @@ dockerbuild: docker
 
 .PHONY: clean_godeps
 clean_godeps: | $(GODEP) $(Godeps)
-	-$(GODEP) restore && go clean -r && go clean -i github.com/zenoss/metricshipper/... # this cleans all dependencies
+	$(GODEP) restore && go clean -r && go clean -i github.com/zenoss/metricshipper/... # this cleans all dependencies
 	@if [ -f "$(Godeps_restored)" ];then \
 		rm -f $(Godeps_restored) ;\
 		echo "rm -f $(Godeps_restored)" ;\
@@ -112,14 +121,3 @@ clean_godeps: | $(GODEP) $(Godeps)
 clean: clean_godeps
 	@go clean
 	@rm -rf output
-
-scratchbuild:
-	@export GOPATH=/tmp/metricshipper-build; \
-		BUILDDIR=$$GOPATH/src/$(PACKAGE); \
-		HERE=$$PWD; \
-		mkdir -p $$BUILDDIR; \
-		rsync -rad $$HERE/ $$BUILDDIR ; \
-		cd $$BUILDDIR; \
-		$(MAKE) clean build; \
-		mkdir -p $$HERE/output; \
-		mv $$BUILDDIR/output/* $$HERE/output
