@@ -9,7 +9,7 @@ default: build
 build: output/metricshipper
 
 output/metricshipper:
-	@go get $(PACKAGE)
+	@go get
 	@mkdir output
 	@cd output && go build $(PACKAGE)
 
@@ -25,7 +25,7 @@ install: output/metricshipper
 	@ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor || echo "Supervisor config already exists"
 
 test:
-	@go get $(PACKAGE)
+	@go get
 	@go test $(PACKAGE)/lib
 	@go test $(PACKAGE)
 
