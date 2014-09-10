@@ -1,6 +1,9 @@
 {
 	"ImportPath": "github.com/zenoss/metricshipper",
 	"GoVersion": "go1.3",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "code.google.com/p/go.net/websocket",
@@ -14,6 +17,10 @@
 		{
 			"ImportPath": "github.com/go-yaml/yaml",
 			"Rev": "fc7f19eff1782a0beae3065097c776183e7d01d0"
+		},
+		{
+			"ImportPath": "github.com/gorilla/websocket",
+			"Rev": "4292df70df546334d4174bcd77271253c9b7835c"
 		},
 		{
 			"ImportPath": "github.com/imdario/mergo",
