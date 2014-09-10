@@ -2,7 +2,7 @@ package metricshipper
 
 import (
 	"fmt"
-	yaml "gopkg.in/yaml.v1"
+	"github.com/go-yaml/yaml"
 	"reflect"
 	"strings"
 	"testing"
