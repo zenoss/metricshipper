@@ -44,6 +44,9 @@ $(FULL_NAME): VERSION *.go hack/* makefile $(GODEPS_FILES)
 	godep go build ${LDFLAGS}
 	chown $(DUID):$(DGID) $(FULL_NAME)
 
+docker-test: $(FULL_NAME)-build
+	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) /bin/sh -c 'redis-server & sleep 1 && make test'
+
 docker-tgz: $(FULL_NAME)-build
 	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make tgz
 
@@ -66,6 +69,9 @@ stage_pkg: $(FULL_NAME)
 	install -m 644 etc/metricshipper_supervisor.conf $(PKGROOT)/usr/etc/metricshipper/metricshipper_supervisor.conf
 	install -m 644 etc/supervisord.conf $(PKGROOT)/usr/etc/metricshipper/supervisord.conf
 	ln -s ../metricshipper/metricshipper_supervisor.conf $(PKGROOT)/usr/etc/supervisor || echo "Supervisor config already exists"
+
+test: $(FULL_NAME)
+	godep go test -v ./...
 
 tgz: stage_pkg
 	tar cvfz /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz -C $(PKGROOT)/usr .

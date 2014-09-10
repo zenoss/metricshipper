@@ -14,4 +14,4 @@ RUN	apt-get install -y -q make ruby ruby-dev rpm
 RUN	gem install fpm
 RUN	apt-get install -qqy mercurial
 RUN	go get github.com/tools/godep
-
+RUN	apt-get install -y -q redis-server
