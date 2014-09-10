@@ -47,6 +47,9 @@ $(FULL_NAME): VERSION *.go hack/* makefile $(GODEPS_FILES)
 docker-test: $(FULL_NAME)-build
 	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) /bin/sh -c 'redis-server & sleep 1 && make test'
 
+# for legacy reasons, remove me later
+dockertest: docker-test
+
 docker-tgz: $(FULL_NAME)-build
 	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make tgz
 
