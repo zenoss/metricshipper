@@ -4,8 +4,8 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
+	"github.com/go-yaml/yaml"
 
-	"gopkg.in/yaml.v1"
 	"io"
 	"io/ioutil"
 	"os"
