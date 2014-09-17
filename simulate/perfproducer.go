@@ -47,7 +47,7 @@ func perfgenerate(channel string, deviceIdx int, components int, prefix string) 
 		metric.Value = gen.Float64()
 		metric.Tags = make(map[string]interface{})
 		metric.Tags["device"] = fmt.Sprintf("%s-%d", prefix, deviceIdx)
-		metric.Tags["uuid"] = metric.Tags["device"]
+		metric.Tags["key"] = metric.Tags["device"]
 		metric.Tags["datasource"] = metric.Metric
 		metric.Tags["tenantid"] = "1yy47k0w99drg1htla4uvhdsg"
 		content, _ := json.Marshal(metric)
@@ -63,7 +63,7 @@ func perfgenerate(channel string, deviceIdx int, components int, prefix string) 
 			metric.Value = gen.Float64()
 			metric.Tags = make(map[string]interface{})
 			metric.Tags["device"] = fmt.Sprintf("%s-%d", prefix, deviceIdx)
-			metric.Tags["uuid"] = fmt.Sprintf("component-%d-%d", deviceIdx, j)
+			metric.Tags["key"] = fmt.Sprintf("component-%d-%d", deviceIdx, j)
 			metric.Tags["datasource"] = metric.Metric
 			metric.Tags["tenantid"] = "1yy47k0w99drg1htla4uvhdsg"
 			content, _ := json.Marshal(metric)
