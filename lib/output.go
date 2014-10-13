@@ -1,7 +1,7 @@
 package metricshipper
 
 import (
-	"code.google.com/p/go.net/websocket"
+	"github.com/zenoss/websocket"
 	"encoding/base64"
 	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
