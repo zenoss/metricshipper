@@ -79,6 +79,12 @@ type RedisReader struct {
 
 // Read a batch of metrics
 func (r *RedisReader) ReadBatch(conn *redis.Conn) (int, error) {
+
+	// ensure that at the end of this function the connection return to a normal state
+	defer func() {
+		(*conn).Do("DISCARD")
+	}()
+
 	var rangeresult []string
 	glog.V(2).Infof("enter RedisReader.ReadBatch( conn=%v)", &(*conn))
 

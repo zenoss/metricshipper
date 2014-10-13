@@ -20,7 +20,8 @@ type WebsocketPublisher struct {
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
-	OutgoingMeter            metrics.Meter // no need to lock since metrics.Meter already does that
+	OutgoingDatapoints       metrics.Meter // number of datapoints written to websocket endpoint
+	OutgoingBytes            metrics.Meter // number of bytes written to websocket endpoint
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
@@ -37,8 +38,10 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	str := base64.StdEncoding.EncodeToString(data)
 	config.Header.Add("Authorization", "basic "+str)
 
-	outgoingMeter := metrics.NewMeter()
-	metrics.Register("outgoingMeter", outgoingMeter)
+	outgoingDatapoints := metrics.NewMeter()
+	metrics.Register("outgoingDatapoints", outgoingDatapoints)
+	outgoingBytes := metrics.NewMeter()
+	metrics.Register("outgoingBytes", outgoingBytes)
 
 	return &WebsocketPublisher{
 		config:                   config,
@@ -49,7 +52,8 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
-		OutgoingMeter:            outgoingMeter,
+		OutgoingDatapoints:       outgoingDatapoints,
+		OutgoingBytes:            outgoingBytes,
 	}, nil
 }
 
@@ -188,7 +192,7 @@ func (w *WebsocketPublisher) DoBatch() {
 					glog.V(2).Infof("Sent %d metrics to the consumer.", sent)
 
 					// update meter with number of metrics sent
-					w.OutgoingMeter.Mark(int64(sent))
+					w.OutgoingDatapoints.Mark(int64(sent))
 
 					break
 				} else {
