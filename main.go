@@ -79,7 +79,8 @@ func main() {
 	s := &metricshipper.MetricStats{
 		MetricsChannel:       &r.Incoming,
 		IncomingMeter:        &r.IncomingMeter,
-		OutgoingMeter:        &w.OutgoingMeter,
+		OutgoingMeter:        &w.OutgoingDatapoints,
+		OutgoingBytes:        &w.OutgoingBytes,
 		StatsInterval:        config.StatsInterval,
 		ControlPlaneStatsURL: os.Getenv("CONTROLPLANE_CONSUMER_URL"),
 	}

@@ -2,7 +2,7 @@ package metricshipper
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
+	"github.com/zenoss/websocket"
 	"log"
 	"net/http"
 	"net/http/httptest"
