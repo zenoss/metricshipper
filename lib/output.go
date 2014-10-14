@@ -1,10 +1,10 @@
 package metricshipper
 
 import (
-	"github.com/zenoss/websocket"
 	"encoding/base64"
 	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
+	"github.com/zenoss/websocket"
 	"strings"
 	"time"
 )
@@ -132,8 +132,11 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
 	return len(buf), batch
 }
 
-func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
+func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes int, err error) {
 	var num int
+	if batch != nil {
+		num = len(batch.Metrics)
+	}
 	var dead *bool = new(bool)
 	*dead = false
 	conn := w.GetConn()
@@ -141,16 +144,15 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
 	defer glog.V(3).Infof("exit sendBatch(), dead=%t, num=%d", *dead, num)
 	defer w.ReleaseConn(conn, dead)
 
-	err := websocket.JSON.Send(conn, batch)
+	bytes, err = websocket.JSON.Send(conn, batch)
 	if err != nil {
 		*dead = true
-		return num, err
+		return num, bytes, err
 	}
 
-	num = len(batch.Metrics)
 	*dead, err = w.readResponse(conn)
 
-	return num, err
+	return num, bytes, err
 }
 
 //read everything in the response buffer
@@ -187,12 +189,13 @@ func (w *WebsocketPublisher) DoBatch() {
 		num, batch := w.getBatch()
 		if num > 0 {
 			for {
-				sent, err := w.sendBatch(batch)
+				metrics, bytes, err := w.sendBatch(batch)
 				if err == nil {
-					glog.V(2).Infof("Sent %d metrics to the consumer.", sent)
+					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
 
 					// update meter with number of metrics sent
-					w.OutgoingDatapoints.Mark(int64(sent))
+					w.OutgoingDatapoints.Mark(int64(metrics))
+					w.OutgoingBytes.Mark(int64(bytes))
 
 					break
 				} else {

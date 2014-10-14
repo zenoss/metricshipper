@@ -17,6 +17,7 @@ type MetricStats struct {
 	MetricsChannel       *chan Metric
 	IncomingMeter        *metrics.Meter
 	OutgoingMeter        *metrics.Meter
+	OutgoingBytes        *metrics.Meter
 	StatsInterval        int
 	ControlPlaneStatsURL string
 
@@ -52,6 +53,7 @@ func (ms *MetricStats) PublishInternalMetrics() {
 	metrics := []Metric{}
 	metrics = append(metrics, generateMeterMetrics(ms.IncomingMeter, "totalIncoming", ms.tags)...)
 	metrics = append(metrics, generateMeterMetrics(ms.OutgoingMeter, "totalOutgoing", ms.tags)...)
+	metrics = append(metrics, generateMeterMetrics(ms.OutgoingBytes, "txBytes", ms.tags)...)
 
 	// set all timestamps to be the same as the first item
 	timestamp := metrics[0].Timestamp
