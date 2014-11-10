@@ -4,7 +4,7 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
-	"github.com/go-yaml/yaml"
+	"gopkg.in/yaml.v1"
 
 	"io"
 	"io/ioutil"
@@ -24,6 +24,7 @@ type ShipperConfig struct {
 	MaxBackoffSteps        int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
 	RetryConnection        int     `long:"retry-connection" description:"Maxiumum retry connections before failing, zero or less implies infinite" default:"0"`
 	RetryConnectionTimeout int     `long:"retry-connection-timeout" description:"Sleep time between connection retry in seconds" default:"1"`
+	MaxConnectionAge       int     `long:"max-connection-age" description:"Max lifespan of a websocket connection in seconds" default:"60"`
 	Verbosity              int     `long:"verbosity" short:"v" description:"Set the glog logging verbosity" default:"0"`
 	Username               string  `long:"username" description:"Username to use when connecting to the consumer"`
 	Password               string  `long:"password" description:"Password to use when connecting to the consumer"`

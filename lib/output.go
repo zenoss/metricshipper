@@ -2,11 +2,12 @@ package metricshipper
 
 import (
 	"encoding/base64"
+	"strings"
+	"time"
+
 	"github.com/rcrowley/go-metrics"
 	"github.com/zenoss/glog"
 	"github.com/zenoss/websocket"
-	"strings"
-	"time"
 )
 
 var origin string = "http://localhost"
@@ -20,14 +21,16 @@ type WebsocketPublisher struct {
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
+	max_connection_age       time.Duration // seconds
 	OutgoingDatapoints       metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes            metrics.Meter // number of bytes written to websocket endpoint
+	conn_ages                map[*websocket.Conn]time.Time
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection int,
-	retry_connection_timeout time.Duration, username string,
-	password string) (publisher *WebsocketPublisher, err error) {
+	retry_connection_timeout time.Duration, max_connection_age time.Duration,
+	username string, password string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -52,8 +55,10 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
+		max_connection_age:       max_connection_age,
 		OutgoingDatapoints:       outgoingDatapoints,
 		OutgoingBytes:            outgoingBytes,
+		conn_ages:                make(map[*websocket.Conn]time.Time),
 	}, nil
 }
 
@@ -78,6 +83,7 @@ func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead *bool) {
 
 	if *dead {
 		conn.Close()
+		delete(w.conn_ages, conn)
 		w.AddConn()
 	} else {
 		w.conn <- conn
@@ -92,6 +98,7 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 		}
 		if conn, dialerr := websocket.DialConfig(w.config); dialerr == nil {
 			glog.Info("Made connection to consumer")
+			w.conn_ages[conn] = time.Now()
 			w.conn <- conn
 			break
 		} else {
@@ -151,6 +158,13 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes i
 	}
 
 	*dead, err = w.readResponse(conn)
+
+	// Allow the connection to die if older than the max age specified
+	has_max_age := w.max_connection_age.Nanoseconds() == 0
+	if has_max_age && time.Now().After(w.conn_ages[conn].Add(w.max_connection_age)) {
+		glog.V(2).Infof("Connection is older than %d seconds; closing", w.max_connection_age.Seconds())
+		*dead = true
+	}
 
 	return num, bytes, err
 }
