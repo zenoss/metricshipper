@@ -1,10 +1,10 @@
 package metricshipper
 
 import (
+	"github.com/go-yaml/yaml"
 	"github.com/imdario/mergo"
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
-	"gopkg.in/yaml.v1"
 
 	"io"
 	"io/ioutil"

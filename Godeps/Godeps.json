@@ -32,7 +32,7 @@
 			"Rev": "1ddd7b38355cfd186f91ada432ef5147fb104a18"
 		},
 		{
-			"ImportPath": "gopkg.in/yaml.v1",
+			"ImportPath": "github.com/go-yaml/yaml",
 			"Rev": "9f9df34309c04878acc86042b16630b0f696e1de"
 		}
 	]
