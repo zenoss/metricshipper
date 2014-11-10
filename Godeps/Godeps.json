@@ -11,7 +11,7 @@
 		},
 		{
 			"ImportPath": "github.com/go-yaml/yaml",
-			"Rev": "fc7f19eff1782a0beae3065097c776183e7d01d0"
+			"Rev": "9f9df34309c04878acc86042b16630b0f696e1de"
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
