@@ -10,8 +10,8 @@
 			"Rev": "6628c86d6a89ce7983c7c9b5e98c1df795fbd256"
 		},
 		{
-			"ImportPath": "github.com/go-yaml/yaml",
-			"Rev": "fc7f19eff1782a0beae3065097c776183e7d01d0"
+			"ImportPath": "gopkg.in/yaml.v1",
+      "Rev": "9f9df34309c04878acc86042b16630b0f696e1de"
 		},
 		{
 			"ImportPath": "github.com/gorilla/websocket",
