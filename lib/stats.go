@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/rcrowley/go-metrics"
-	"github.com/zenoss/glog"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/zenoss/glog"
 )
 
 // MetricStats publishes and reports internal metrics
@@ -20,12 +21,12 @@ type MetricStats struct {
 	StatsInterval        int
 	ControlPlaneStatsURL string
 
-	tags map[string]interface{}
+	tags map[string]string
 }
 
 // Start starts the stats publishing/reporting
 func (ms *MetricStats) Start() {
-	ms.tags = make(map[string]interface{})
+	ms.tags = make(map[string]string)
 	host, err := os.Hostname()
 	if err != nil {
 		glog.Errorf("unable to get hostname: %s - setting 'host' to 'UNKNOWN'", err)
@@ -113,7 +114,7 @@ func (ms *MetricStats) PublishInternalMetrics() {
 }
 
 // generateMeterMetrics creates a slice of Metrics from a meter and name
-func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]interface{}) []Metric {
+func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]string) []Metric {
 	prefix := fmt.Sprintf("ZEN_INF.org.zenoss.app.metricshipper.%s", infix)
 
 	metrics := []Metric{}
@@ -130,7 +131,7 @@ func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]in
 }
 
 // toMetric creates a Metric from a name and value
-func toMetric(name string, value float64, tags map[string]interface{}) Metric {
+func toMetric(name string, value float64, tags map[string]string) Metric {
 	metric := Metric{}
 	metric.Metric = name
 	metric.Timestamp = float64(time.Now().Unix())

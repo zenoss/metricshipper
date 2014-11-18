@@ -18,10 +18,17 @@ func (s PublisherError) Error() string {
 
 // Defines the structure of a Metric message
 type Metric struct {
-	Timestamp float64                `json:"timestamp"`
-	Metric    string                 `json:"metric"`
-	Value     float64                `json:"value"`
-	Tags      map[string]interface{} `json:"tags"`
+	Timestamp float64           `json:"timestamp"`
+	Metric    string            `json:"metric"`
+	Value     float64           `json:"value"`
+	Tags      map[string]string `json:"tags"`
+}
+
+type CompressedMetric struct {
+	Timestamp int64       `json:"t"`
+	Metric    int         `json:"m"`
+	Value     float64     `json:"v"`
+	Tags      map[int]int `json:"x"`
 }
 
 //UnmarshalJSON supports string and non-string encoded Metric Values
@@ -70,7 +77,7 @@ func (m *Metric) UnmarshalJSON(data []byte) (err error) {
 	//convert tags
 	if v, ok := fieldMap["tags"]; ok {
 		if v == nil {
-		} else if m.Tags, ok = v.(map[string]interface{}); ok {
+		} else if m.Tags, ok = v.(map[string]string); ok {
 		} else {
 			return fmt.Errorf("Illegal metric tags: %s", v)
 		}
