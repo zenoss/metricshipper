@@ -25,7 +25,7 @@ type Metric struct {
 }
 
 type CompressedMetric struct {
-	Timestamp int64       `json:"t"`
+	Timestamp float64     `json:"t"`
 	Metric    int         `json:"m"`
 	Value     float64     `json:"v"`
 	Tags      map[int]int `json:"x"`
