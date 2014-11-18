@@ -1,12 +1,13 @@
 package metricshipper
 
 import (
-	"code.google.com/p/go.net/websocket"
 	"encoding/base64"
-	"github.com/rcrowley/go-metrics"
-	"github.com/zenoss/glog"
 	"strings"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/zenoss/glog"
+	"github.com/zenoss/websocket"
 )
 
 var origin string = "http://localhost"
@@ -20,13 +21,16 @@ type WebsocketPublisher struct {
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
-	OutgoingMeter            metrics.Meter // no need to lock since metrics.Meter already does that
+	max_connection_age       time.Duration // seconds
+	OutgoingDatapoints       metrics.Meter // number of datapoints written to websocket endpoint
+	OutgoingBytes            metrics.Meter // number of bytes written to websocket endpoint
+	conn_ages                map[*websocket.Conn]time.Time
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection int,
-	retry_connection_timeout time.Duration, username string,
-	password string) (publisher *WebsocketPublisher, err error) {
+	retry_connection_timeout time.Duration, max_connection_age time.Duration,
+	username string, password string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -37,8 +41,10 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	str := base64.StdEncoding.EncodeToString(data)
 	config.Header.Add("Authorization", "basic "+str)
 
-	outgoingMeter := metrics.NewMeter()
-	metrics.Register("outgoingMeter", outgoingMeter)
+	outgoingDatapoints := metrics.NewMeter()
+	metrics.Register("outgoingDatapoints", outgoingDatapoints)
+	outgoingBytes := metrics.NewMeter()
+	metrics.Register("outgoingBytes", outgoingBytes)
 
 	return &WebsocketPublisher{
 		config:                   config,
@@ -49,7 +55,10 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
-		OutgoingMeter:            outgoingMeter,
+		max_connection_age:       max_connection_age,
+		OutgoingDatapoints:       outgoingDatapoints,
+		OutgoingBytes:            outgoingBytes,
+		conn_ages:                make(map[*websocket.Conn]time.Time),
 	}, nil
 }
 
@@ -74,6 +83,7 @@ func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead *bool) {
 
 	if *dead {
 		conn.Close()
+		delete(w.conn_ages, conn)
 		w.AddConn()
 	} else {
 		w.conn <- conn
@@ -88,6 +98,7 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 		}
 		if conn, dialerr := websocket.DialConfig(w.config); dialerr == nil {
 			glog.Info("Made connection to consumer")
+			w.conn_ages[conn] = time.Now()
 			w.conn <- conn
 			break
 		} else {
@@ -128,8 +139,11 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
 	return len(buf), batch
 }
 
-func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
+func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes int, err error) {
 	var num int
+	if batch != nil {
+		num = len(batch.Metrics)
+	}
 	var dead *bool = new(bool)
 	*dead = false
 	conn := w.GetConn()
@@ -137,16 +151,22 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (int, error) {
 	defer glog.V(3).Infof("exit sendBatch(), dead=%t, num=%d", *dead, num)
 	defer w.ReleaseConn(conn, dead)
 
-	err := websocket.JSON.Send(conn, batch)
+	bytes, err = websocket.JSON.Send(conn, batch)
 	if err != nil {
 		*dead = true
-		return num, err
+		return num, bytes, err
 	}
 
-	num = len(batch.Metrics)
 	*dead, err = w.readResponse(conn)
 
-	return num, err
+	// Allow the connection to die if older than the max age specified
+	has_max_age := w.max_connection_age.Nanoseconds() == 0
+	if has_max_age && time.Now().After(w.conn_ages[conn].Add(w.max_connection_age)) {
+		glog.V(2).Infof("Connection is older than %d seconds; closing", w.max_connection_age.Seconds())
+		*dead = true
+	}
+
+	return num, bytes, err
 }
 
 //read everything in the response buffer
@@ -183,12 +203,13 @@ func (w *WebsocketPublisher) DoBatch() {
 		num, batch := w.getBatch()
 		if num > 0 {
 			for {
-				sent, err := w.sendBatch(batch)
+				metrics, bytes, err := w.sendBatch(batch)
 				if err == nil {
-					glog.V(2).Infof("Sent %d metrics to the consumer.", sent)
+					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
 
 					// update meter with number of metrics sent
-					w.OutgoingMeter.Mark(int64(sent))
+					w.OutgoingDatapoints.Mark(int64(metrics))
+					w.OutgoingBytes.Mark(int64(bytes))
 
 					break
 				} else {

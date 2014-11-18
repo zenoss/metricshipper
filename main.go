@@ -44,7 +44,7 @@ func main() {
 	w, err := metricshipper.NewWebsocketPublisher(config.ConsumerUrl,
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, config.RetryConnection, time.Duration(config.RetryConnectionTimeout),
-		config.Username, config.Password)
+		time.Duration(config.MaxConnectionAge), config.Username, config.Password)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return
@@ -79,7 +79,8 @@ func main() {
 	s := &metricshipper.MetricStats{
 		MetricsChannel:       &r.Incoming,
 		IncomingMeter:        &r.IncomingMeter,
-		OutgoingMeter:        &w.OutgoingMeter,
+		OutgoingMeter:        &w.OutgoingDatapoints,
+		OutgoingBytes:        &w.OutgoingBytes,
 		StatsInterval:        config.StatsInterval,
 		ControlPlaneStatsURL: os.Getenv("CONTROLPLANE_CONSUMER_URL"),
 	}

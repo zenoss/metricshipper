@@ -41,6 +41,11 @@
 #
 #batchtimeout: 0.1
 
+# Maximum age in seconds of websocket connections before they are closed and
+# reopened. Set to 0 to disable autoclosing connections.
+#
+#maxconnectionage: 60
+
 # Rolling time period in seconds to consider slow-down messages from the
 # consumer.
 #

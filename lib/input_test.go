@@ -58,10 +58,10 @@ func dial() (redis.Conn, error) {
 	return testConn{c}, nil
 }
 
-func sendone(metric string, conn redis.Conn) {
+func sendone(metric string, conn redis.Conn) error {
 	m := &Metric{Metric: metric}
 	s, _ := json.Marshal(m)
-	conn.Send("RPUSH", queue_name, s)
+	return conn.Send("RPUSH", queue_name, s)
 }
 
 func TestParseRedisUri(t *testing.T) {
@@ -241,11 +241,17 @@ func TestDrain(t *testing.T) {
 	conn := reader.pool.Get()
 	defer conn.Close()
 	defer conn.Do("DEL", queue_name)
-	conn.Do("DEL", queue_name)
-	for i := 0; i < 10; i++ {
-		sendone(strconv.Itoa(i), conn)
+	if _, err := conn.Do("DEL", queue_name); err != nil {
+		t.Fatalf("could not call DEL: %s", err)
 	}
-	conn.Flush()
+	for i := 0; i < 10; i++ {
+		if err := sendone(strconv.Itoa(i), conn); err != nil {
+			t.Fatalf("could send item: %s", err)
+		}
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatalf("Could not flush: %s", err)
+	}
 	reader.Drain()
 	close(reader.Incoming)
 	seen := make([]interface{}, 0)
@@ -267,12 +273,21 @@ func TestSubscribe(t *testing.T) {
 	conn := reader.pool.Get()
 	defer conn.Close()
 	defer conn.Do("DEL", queue_name)
-	conn.Do("DEL", queue_name)
-	for i := 0; i < 10; i++ {
-		sendone(strconv.Itoa(i), conn)
+	if _, err := conn.Do("DEL", queue_name); err != nil {
+		t.Fatalf("Could not call DEL: %s", err)
 	}
-	conn.Flush()
-	llen, _ := redis.Int(conn.Do("LLEN", queue_name))
+	for i := 0; i < 10; i++ {
+		if err := sendone(strconv.Itoa(i), conn); err != nil {
+			t.Fatalf("could not send item: %s", err)
+		}
+	}
+	if err := conn.Flush(); err != nil {
+		t.Fatalf("could not flush: %s", err)
+	}
+	llen, err := redis.Int(conn.Do("LLEN", queue_name))
+	if err != nil {
+		t.Fatalf("error reading LLEN: %s", err)
+	}
 	if llen != 10 {
 		t.Error("Messages did not make it to redis")
 	}
@@ -281,7 +296,10 @@ func TestSubscribe(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// Check the length now, should have been read
-	llen, _ = redis.Int(conn.Do("LLEN", queue_name))
+	llen, err = redis.Int(conn.Do("LLEN", queue_name))
+	if err != nil {
+		t.Fatalf("error reading LLEN: %s", err)
+	}
 	if llen != 0 {
 		t.Error("Subscriber didn't hear control message")
 	}

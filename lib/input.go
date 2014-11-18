@@ -78,7 +78,13 @@ type RedisReader struct {
 }
 
 // Read a batch of metrics
-func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
+func (r *RedisReader) ReadBatch(conn *redis.Conn) (int, error) {
+
+	// ensure that at the end of this function the connection return to a normal state
+	defer func() {
+		(*conn).Do("DISCARD")
+	}()
+
 	var rangeresult []string
 	glog.V(2).Infof("enter RedisReader.ReadBatch( conn=%v)", &(*conn))
 
@@ -87,19 +93,19 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	var send_err error
 	if send_err = (*conn).Send("MULTI"); send_err != nil {
 		glog.Errorf("Error sending command, multi: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
 	//read from end of list (oldest values)
 	if send_err = (*conn).Send("LRANGE", r.queue_name, -r.batch_size, -1); send_err != nil {
 		glog.Errorf("Error sending command, lrange: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
 	//trim keeps newest values (values not yet read)
 	if send_err = (*conn).Send("LTRIM", r.queue_name, 0, -r.batch_size-1); send_err != nil {
 		glog.Errorf("Error sending command, ltrim: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
 	//read redis values
@@ -107,14 +113,14 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	values, err := redis.Values((*conn).Do("EXEC"))
 	if err != nil {
 		glog.Errorf("Error retrieving metric values: %s", err)
-		return -1
+		return 0, err
 	}
 
 	//scan redis values
 	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Scanning Values")
 	if _, err := redis.Scan(values, &rangeresult); err != nil {
 		glog.Errorf("Error scanning metric values: %s", err)
-		return -1
+		return 0, err
 	}
 
 	var validmetric_count int64
@@ -135,7 +141,7 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	r.IncomingMeter.Mark(validmetric_count)
 
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
-	return len(rangeresult)
+	return len(rangeresult), nil
 }
 
 // Drain the redis queue into the out channel until there's nothing left.
@@ -150,14 +156,14 @@ func (r *RedisReader) Drain() {
 			conn := r.pool.Get()
 			defer conn.Close()
 			for {
-				count := r.ReadBatch(&conn)
+				count, err := r.ReadBatch(&conn)
+				// there was an error pulling data, create a new connection
+				if err != nil {
+					break
+				}
 				// If no metrics were returned, this goroutine's job is done
 				if count == 0 {
 					done = true
-					break
-				}
-				// there was an error pulling data, create a new connection
-				if count < 0 {
 					break
 				}
 			}

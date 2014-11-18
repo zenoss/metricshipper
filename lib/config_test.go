@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	yaml "gopkg.in/v1/yaml"
+	"gopkg.in/v1/yaml"
 )
 
 func testConfigValues(config map[string]interface{}, t *testing.T) {

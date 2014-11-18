@@ -1,56 +1,131 @@
-PREFIX ?= $(ZENHOME)
-PACKAGE=github.com/zenoss/metricshipper
+# Copyright (C) 2014 Zenoss, Inc
+#
+# metricshipper is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# metricshipper is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Foobar. If not, see <http://www.gnu.org/licenses/>.
+
+## setup all environment stuff
+URL           = https://github.com/zenoss/metricshipper
+FULL_NAME     = $(shell basename $(URL))
+VERSION      := $(shell cat ./VERSION)
+DATE         := $(shell date -u)
+GIT_COMMIT   ?= $(shell ./hack/gitstatus.sh)
+GIT_BRANCH   ?= $(shell git rev-parse --abbrev-ref HEAD)
+# jenkins default, jenkins-${JOB_NAME}-${BUILD_NUMBER}
+BUILD_TAG    ?= 0
+LDFLAGS       = -ldflags "-X main.Version $(VERSION) -X main.Gitcommit '$(GIT_COMMIT)' -X main.Gitbranch '$(GIT_BRANCH)' -X main.Date '$(DATE)' -X main.Buildtag '$(BUILD_TAG)'"
+
+MAINTAINER    = dev@zenoss.com
+# https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification
+DEB_LICENSE   = "GPL-2.0"
+# https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing
+RPM_LICENSE   = "GPLv2"
+VENDOR        = Zenoss
+PKGROOT       = /tmp/$(FULL_NAME)-pkgroot-$(GIT_COMMIT)
+DUID         ?= $(shell id -u)
+DGID         ?= $(shell id -g)
+DESCRIPTION  := A broker to ship performance data published to redis to the Zenoss datapoint consumer.
+GODEPS_FILES := $(shell find Godeps/)
+FULL_PATH     = $(shell echo $(URL) | sed 's|https:/||')
+DOCKER_WDIR  := /go/src$(FULL_PATH)
 
 
-default: build
+## generic workhorse targets
+$(FULL_NAME): VERSION *.go hack/* makefile $(GODEPS_FILES)
+	godep go build ${LDFLAGS}
+	chown $(DUID):$(DGID) $(FULL_NAME)
 
-.PHONY: default build install test docker dockertest dockerbuild clean
+docker-test: $(FULL_NAME)-build
+	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) /bin/sh -c 'redis-server & sleep 1 && make test'
 
-build: output/metricshipper
+# for legacy reasons, remove me later
+dockertest: docker-test
 
-output/metricshipper:
-	@go get $(PACKAGE)
-	@mkdir output
-	@cd output && go build $(PACKAGE)
+docker-tgz: $(FULL_NAME)-build
+	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make tgz
 
-devinstall: output/metricshipper
-	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
+docker-deb: $(FULL_NAME)-build
+	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make deb
 
-install: output/metricshipper
-	@mkdir -p $(PREFIX)/etc/supervisor $(PREFIX)/bin $(PREFIX)/etc/metricshipper
-	@install -m 755 output/metricshipper $(PREFIX)/bin/metricshipper
-	@install -m 644 etc/metricshipper.yaml $(PREFIX)/etc/metricshipper/metricshipper.yaml
-	@install -m 644 etc/metricshipper_supervisor.conf $(PREFIX)/etc/metricshipper/metricshipper_supervisor.conf
-	@install -m 644 etc/supervisord.conf $(PREFIX)/etc/metricshipper/supervisord.conf
-	@ln -s ../metricshipper/metricshipper_supervisor.conf $(PREFIX)/etc/supervisor || echo "Supervisor config already exists"
+docker-rpm: $(FULL_NAME)-build
+	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make rpm
 
-test:
-	@go get $(PACKAGE)
-	@go test $(PACKAGE)/lib
-	@go test $(PACKAGE)
+# actual work
+.PHONY: $(FULL_NAME)-build
+$(FULL_NAME)-build:
+	docker build -t zenoss/$(FULL_NAME)-build:$(VERSION) hack
 
-docker:
-	@docker ps > /dev/null && echo "Docker ok"
 
-dockertest: docker
-	@docker build -t zenoss/metricshipper-build .
-	@docker run -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "service redis-server start && make clean test"
+stage_pkg: $(FULL_NAME)
+	mkdir -p $(PKGROOT)/usr/etc/supervisor $(PKGROOT)/usr/bin $(PKGROOT)/usr/etc/metricshipper
+	install -m 755 $(FULL_NAME) $(PKGROOT)/usr/bin/$(FULL_NAME)
+	install -m 644 etc/metricshipper.yaml $(PKGROOT)/usr/etc/metricshipper/metricshipper.yaml
+	install -m 644 etc/metricshipper_supervisor.conf $(PKGROOT)/usr/etc/metricshipper/metricshipper_supervisor.conf
+	install -m 644 etc/supervisord.conf $(PKGROOT)/usr/etc/metricshipper/supervisord.conf
+	ln -s ../metricshipper/metricshipper_supervisor.conf $(PKGROOT)/usr/etc/supervisor || echo "Supervisor config already exists"
 
-dockerbuild: docker
-	@docker build -t zenoss/metricshipper-build .
-	@docker run -e UID=$$(id -u) -v $${PWD}:/gosrc/src/$(PACKAGE) -t zenoss/metricshipper-build /bin/bash -c "make clean build && chown -R $${UID}:$${UID} /gosrc/src/$(PACKAGE)/output"
+test: $(FULL_NAME)
+	godep go test -v ./...
 
-scratchbuild:
-	@export GOPATH=/tmp/metricshipper-build; \
-		BUILDDIR=$$GOPATH/src/$(PACKAGE); \
-		HERE=$$PWD; \
-		mkdir -p $$BUILDDIR; \
-		rsync -rad $$HERE/ $$BUILDDIR ; \
-		cd $$BUILDDIR; \
-		$(MAKE) clean build; \
-		mkdir -p $$HERE/output; \
-		mv $$BUILDDIR/output/* $$HERE/output
+tgz: stage_pkg
+	tar cvfz /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz -C $(PKGROOT)/usr .
+	chown $(DUID):$(DGID) /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz
+	mv /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz .
+
+deb: stage_pkg
+	fpm \
+		-n $(FULL_NAME) \
+		-v $(VERSION) \
+		-s dir \
+		-t deb \
+		-a x86_64 \
+		-C $(PKGROOT) \
+		-m $(MAINTAINER) \
+		--description "$(DESCRIPTION)" \
+		--deb-user root \
+		--deb-group root \
+		--license $(DEB_LICENSE) \
+		--vendor $(VENDOR) \
+		--url $(URL) \
+		-f -p /tmp \
+		.
+	chown $(DUID):$(DGID) /tmp/*.deb
+	cp -p /tmp/*.deb .
+
+rpm: stage_pkg
+	fpm \
+		-n $(FULL_NAME) \
+		-v $(VERSION) \
+		-s dir \
+		-t rpm \
+		-a x86_64 \
+		-C $(PKGROOT) \
+		-m $(MAINTAINER) \
+		--description "$(DESCRIPTION)" \
+		--rpm-user root \
+		--rpm-group root \
+		--license $(RPM_LICENSE) \
+		--vendor $(VENDOR) \
+		--url $(URL) \
+		-f -p /tmp \
+		.
+	chown $(DUID):$(DGID) /tmp/*.rpm
+	cp -p /tmp/*.rpm .
 
 clean:
-	@go clean
-	@rm -rf output
+	go clean
+	rm -f *.deb
+	rm -f *.rpm
+	rm -f *.tgz
+	rm -fr /tmp/$(FULL_NAME)-pkgroot-*
+
+
