@@ -102,8 +102,9 @@ func (m Metric) Equal(that Metric) bool {
 
 // Structure of message forwarded via websocket
 type MetricBatch struct {
-	Control interface{} `json:"control"` // Should be nil
-	Metrics []Metric    `json:"metrics"`
+	Control    interface{}        `json:"control"` // Should be nil
+	Metrics    []Metric           `json:"metrics"`
+	Compressed []CompressedMetric `json:"cmetrics"`
 }
 
 // Convert a JSON-serialized metric into an instance

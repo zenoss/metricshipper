@@ -1,9 +1,6 @@
 package metricshipper
 
-import (
-	"fmt"
-	"testing"
-)
+import "testing"
 
 func TestCompression(t *testing.T) {
 	mapper := NewMapper()
@@ -16,5 +13,11 @@ func TestCompression(t *testing.T) {
 		},
 	}
 	compressed, changes := mapper.Compress(&metric)
-	fmt.Printf("%+v %+v", compressed, changes)
+	uncompressed, err := decompress(compressed, changes)
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+	if !uncompressed.Equal(metric) {
+		t.Fatalf("Oh no the metrics don't match")
+	}
 }
