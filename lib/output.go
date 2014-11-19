@@ -18,6 +18,7 @@ type WebsocketPublisher struct {
 	conn                     chan *websocket.Conn
 	batch_size               int
 	batch_timeout            float64
+	compression              bool
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
@@ -31,7 +32,7 @@ type WebsocketPublisher struct {
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection int,
 	retry_connection_timeout time.Duration, max_connection_age time.Duration,
-	username string, password string) (publisher *WebsocketPublisher, err error) {
+	username string, password string, compression bool) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -53,6 +54,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		conn:                     make(chan *websocket.Conn, concurrency),
 		batch_size:               batch_size,
 		batch_timeout:            batch_timeout,
+		compression:              compression,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
@@ -154,18 +156,20 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes i
 	defer glog.V(3).Infof("exit sendBatch(), dead=%t, num=%d", *dead, num)
 	defer w.ReleaseConn(conn, dead)
 
-	// compress the batch
-	mapper := w.conn_mappers[conn]
-	dictionary := make(map[int]string)
-	batch.Compressed = []CompressedMetric{}
-	for _, m := range batch.Metrics {
-		compressed, changes := mapper.Compress(&m)
-		for k, v := range changes {
-			dictionary[k] = v
+	if w.compression {
+		// compress the batch
+		mapper := w.conn_mappers[conn]
+		dictionary := make(map[string]string)
+		batch.Compressed = []CompressedMetric{}
+		for _, m := range batch.Metrics {
+			compressed, changes := mapper.Compress(&m)
+			for k, v := range changes {
+				dictionary[k] = v
+			}
+			batch.Compressed = append(batch.Compressed, *compressed)
 		}
-		batch.Compressed = append(batch.Compressed, *compressed)
+		batch.Metrics = nil
 	}
-	batch.Metrics = nil
 
 	bytes, err = websocket.JSON.Send(conn, batch)
 	if err != nil {

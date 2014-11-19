@@ -25,10 +25,10 @@ type Metric struct {
 }
 
 type CompressedMetric struct {
-	Timestamp float64     `json:"t"`
-	Metric    int         `json:"m"`
-	Value     float64     `json:"v"`
-	Tags      map[int]int `json:"x"`
+	Timestamp float64           `json:"t"`
+	Metric    string            `json:"m"`
+	Value     float64           `json:"v"`
+	Tags      map[string]string `json:"x"`
 }
 
 //UnmarshalJSON supports string and non-string encoded Metric Values

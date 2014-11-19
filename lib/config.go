@@ -30,6 +30,7 @@ type ShipperConfig struct {
 	Password               string  `long:"password" description:"Password to use when connecting to the consumer"`
 	CPUs                   int     `long:"num-cpus" description:"Number of CPUs to use." default:"4"`
 	StatsInterval          int     `long:"stats-interval" description:"Number of seconds between publishing stats" default:"30"`
+	Compression            bool    `long:compression" short:"z" description:"Whether to encode metrics to use less bandwidth"`
 }
 
 func LoadYAMLConfig(reader io.Reader, cfg *ShipperConfig) error {

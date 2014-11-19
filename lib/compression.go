@@ -7,21 +7,23 @@ import (
 
 type TranslationMap struct {
 	sync.Mutex
-	last  int
-	trans map[string]int
+	last  byte
+	trans map[string]string
 }
 
-func (m *TranslationMap) Translate(s string) (repr int, isdelta bool) {
+func (m *TranslationMap) Translate(s string) (string, bool) {
+	var isdelta bool
 	if v, ok := m.trans[s]; ok {
 		return v, false
 	}
 	m.Lock()
 	defer m.Unlock()
-	repr = m.last + 1
-	m.last = repr
+	next := m.last + 1
+	m.last = next
+	repr := string(next)
 	m.trans[s] = repr
 	isdelta = true
-	return
+	return repr, isdelta
 }
 
 type Mapper struct {
@@ -31,19 +33,19 @@ type Mapper struct {
 func NewMapper() *Mapper {
 	return &Mapper{
 		TranslationMap{
-			trans: make(map[string]int),
+			trans: make(map[string]string),
 		},
 	}
 }
 
-func (mapper *Mapper) Compress(m *Metric) (*CompressedMetric, map[int]string) {
+func (mapper *Mapper) Compress(m *Metric) (*CompressedMetric, map[string]string) {
 	var (
 		isdelta bool
-		c_key   int
-		c_val   int
+		c_key   string
+		c_val   string
 		c       = &CompressedMetric{}
 	)
-	deltas := make(map[int]string)
+	deltas := make(map[string]string)
 	// First copy the things that are already numeric
 	c.Timestamp = m.Timestamp
 	c.Value = m.Value
@@ -51,7 +53,7 @@ func (mapper *Mapper) Compress(m *Metric) (*CompressedMetric, map[int]string) {
 	if c.Metric, isdelta = mapper.trans.Translate(m.Metric); isdelta {
 		deltas[c.Metric] = m.Metric
 	}
-	c.Tags = make(map[int]int)
+	c.Tags = make(map[string]string)
 	for k, v := range m.Tags {
 		if c_key, isdelta = mapper.trans.Translate(k); isdelta {
 			deltas[c_key] = k
@@ -66,7 +68,7 @@ func (mapper *Mapper) Compress(m *Metric) (*CompressedMetric, map[int]string) {
 }
 
 // decompress() is just for testing
-func decompress(c *CompressedMetric, dictionary map[int]string) (*Metric, error) {
+func decompress(c *CompressedMetric, dictionary map[string]string) (*Metric, error) {
 	var (
 		ok           bool
 		c_key, c_val string
