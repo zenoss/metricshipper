@@ -11,7 +11,7 @@ func TestCompression(t *testing.T) {
 		Timestamp: 0,
 		Metric:    "la",
 		Value:     15.25,
-		Tags: map[string]string{
+		Tags: map[string]interface{}{
 			"tenant_id": "XXX",
 		},
 	}

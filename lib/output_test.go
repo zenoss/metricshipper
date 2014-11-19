@@ -21,7 +21,7 @@ func clearBuffer() {
 	buf = buf[:0]
 }
 
-func getMetric() (metric *Metric) {
+func getMetric() (metric Metric) {
 	var buffer bytes.Buffer
 	now := strconv.Itoa(int(time.Now().Unix()))
 	buffer.WriteString("{\"timestamp\":")
@@ -34,7 +34,7 @@ func getMetric() (metric *Metric) {
 
 func stageMetrics(num int, pub *WebsocketPublisher) {
 	for i := 0; i < num; i++ {
-		pub.Outgoing <- *getMetric()
+		pub.Outgoing <- getMetric()
 	}
 }
 

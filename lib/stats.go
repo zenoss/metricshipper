@@ -22,12 +22,12 @@ type MetricStats struct {
 	StatsInterval        int
 	ControlPlaneStatsURL string
 
-	tags map[string]string
+	tags map[string]interface{}
 }
 
 // Start starts the stats publishing/reporting
 func (ms *MetricStats) Start() {
-	ms.tags = make(map[string]string)
+	ms.tags = make(map[string]interface{})
 	host, err := os.Hostname()
 	if err != nil {
 		glog.Errorf("unable to get hostname: %s - setting 'host' to 'UNKNOWN'", err)
@@ -116,7 +116,7 @@ func (ms *MetricStats) PublishInternalMetrics() {
 }
 
 // generateMeterMetrics creates a slice of Metrics from a meter and name
-func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]string) []Metric {
+func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]interface{}) []Metric {
 	prefix := fmt.Sprintf("ZEN_INF.org.zenoss.app.metricshipper.%s", infix)
 
 	metrics := []Metric{}
@@ -133,7 +133,7 @@ func generateMeterMetrics(meter *metrics.Meter, infix string, tags map[string]st
 }
 
 // toMetric creates a Metric from a name and value
-func toMetric(name string, value float64, tags map[string]string) Metric {
+func toMetric(name string, value float64, tags map[string]interface{}) Metric {
 	metric := Metric{}
 	metric.Metric = name
 	metric.Timestamp = float64(time.Now().Unix())

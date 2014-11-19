@@ -41,8 +41,8 @@ func TestMetricFromJSONParsesStringValue(t *testing.T) {
 		MetricFromJSONTestCase{"{ \"tags\":[]}", "Illegal metric tags:", Metric{}},
 
 		MetricFromJSONTestCase{"{ \"tags\":null}", "", Metric{}},
-		MetricFromJSONTestCase{"{ \"tags\":{}}", "", Metric{Tags: map[string]string{}}},
-		MetricFromJSONTestCase{"{ \"tags\":{\"1\":\"1\",\"2\":\"2\"}}", "", Metric{Tags: map[string]string{"1": "1", "2": "2"}}},
+		MetricFromJSONTestCase{"{ \"tags\":{}}", "", Metric{Tags: map[string]interface{}{}}},
+		MetricFromJSONTestCase{"{ \"tags\":{\"1\":\"1\",\"2\":\"2\"}}", "", Metric{Tags: map[string]interface{}{"1": "1", "2": "2"}}},
 
 		//successful test
 		MetricFromJSONTestCase{
@@ -59,7 +59,7 @@ func TestMetricFromJSONParsesStringValue(t *testing.T) {
 				Timestamp: 0,
 				Metric:    "la",
 				Value:     15.25,
-				Tags: map[string]string{
+				Tags: map[string]interface{}{
 					"tenant_id": "XXX",
 				},
 			},

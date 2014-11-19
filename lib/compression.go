@@ -57,8 +57,9 @@ func (mapper *Mapper) Compress(m *Metric) (*CompressedMetric, map[int]string) {
 		if c_key, isdelta = mapper.trans.Translate(k); isdelta {
 			deltas[c_key] = k
 		}
-		if c_val, isdelta = mapper.trans.Translate(v); isdelta {
-			deltas[c_val] = v
+		string_val := v.(string)
+		if c_val, isdelta = mapper.trans.Translate(string_val); isdelta {
+			deltas[c_val] = string_val
 		}
 		c.Tags[c_key] = c_val
 	}
