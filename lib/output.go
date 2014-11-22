@@ -18,6 +18,7 @@ type WebsocketPublisher struct {
 	conn                     chan *websocket.Conn
 	batch_size               int
 	batch_timeout            float64
+	encoding                 string
 	Outgoing                 chan Metric
 	retry_connection         int
 	retry_connection_timeout time.Duration //seconds
@@ -25,12 +26,13 @@ type WebsocketPublisher struct {
 	OutgoingDatapoints       metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes            metrics.Meter // number of bytes written to websocket endpoint
 	conn_ages                map[*websocket.Conn]time.Time
+	conn_dicts               map[*websocket.Conn]*dictionary
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection int,
 	retry_connection_timeout time.Duration, max_connection_age time.Duration,
-	username string, password string) (publisher *WebsocketPublisher, err error) {
+	username string, password string, encoding string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -52,6 +54,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		conn:                     make(chan *websocket.Conn, concurrency),
 		batch_size:               batch_size,
 		batch_timeout:            batch_timeout,
+		encoding:                 encoding,
 		Outgoing:                 make(chan Metric, buffer_size),
 		retry_connection:         retry_connection,
 		retry_connection_timeout: retry_connection_timeout,
@@ -59,6 +62,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		OutgoingDatapoints:       outgoingDatapoints,
 		OutgoingBytes:            outgoingBytes,
 		conn_ages:                make(map[*websocket.Conn]time.Time),
+		conn_dicts:               make(map[*websocket.Conn]*dictionary),
 	}, nil
 }
 
@@ -84,6 +88,7 @@ func (w *WebsocketPublisher) ReleaseConn(conn *websocket.Conn, dead *bool) {
 	if *dead {
 		conn.Close()
 		delete(w.conn_ages, conn)
+		delete(w.conn_dicts, conn)
 		w.AddConn()
 	} else {
 		w.conn <- conn
@@ -99,6 +104,7 @@ func (w *WebsocketPublisher) AddConn() (err error) {
 		if conn, dialerr := websocket.DialConfig(w.config); dialerr == nil {
 			glog.Info("Made connection to consumer")
 			w.conn_ages[conn] = time.Now()
+			w.conn_dicts[conn] = &dictionary{trans: make(map[string]int32)}
 			w.conn <- conn
 			break
 		} else {
@@ -151,7 +157,16 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes i
 	defer glog.V(3).Infof("exit sendBatch(), dead=%t, num=%d", *dead, num)
 	defer w.ReleaseConn(conn, dead)
 
-	bytes, err = websocket.JSON.Send(conn, batch)
+	switch strings.ToLower(w.encoding) {
+	case "json":
+		bytes, err = websocket.JSON.Send(conn, batch)
+	case "binary":
+		msg, err := batch.MarshalBinary(w.conn_dicts[conn])
+		if err != nil {
+			return num, bytes, err
+		}
+		bytes, err = websocket.Message.Send(conn, msg)
+	}
 	if err != nil {
 		*dead = true
 		return num, bytes, err

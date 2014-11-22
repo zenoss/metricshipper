@@ -6,25 +6,28 @@ import (
 	"github.com/zenoss/glog"
 	flags "github.com/zenoss/go-flags"
 
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 )
 
 type ShipperConfig struct {
 	ConfigFilePath         string  `long:"config" short:"c" description:"Path to configuration file"`
 	RedisUrl               string  `long:"redis-url" description:"Redis URL to subscribe to" default:"redis://localhost:6379/0/metrics"`
 	Readers                int     `long:"readers" description:"Maximum number of simultaneous readers from Redis" default:"2"`
-	ConsumerUrl            string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8080/ws/metrics/store"`
+	ConsumerUrl            string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8443/ws/metrics/store"`
 	Writers                int     `long:"writers" description:"Maximum number of simultaneous writers to the consumer" default:"1"`
 	MaxBufferSize          int     `long:"max-buffer-size" description:"Maximum number of messages to keep in the internal buffer" default:"1024"`
 	MaxBatchSize           int     `long:"max-batch-size" description:"Number of messages to send to the consumer in a single web socket call. This should be smaller than the buffer size." default:"64"`
 	BatchTimeout           float64 `long:"batch-timeout-seconds" description:"Maximum time in seconds to wait for messages from the internal buffer to be ready before making a web socket call with current metrics." default:"1"`
+	Encoding               string  `long:"encoding" description:"Encoding for metric publishing (valid values are 'json' or 'binary')" default:"json"`
 	BackoffWindow          int     `long:"backoff-window-seconds" description:"Rolling time period in seconds to consider collision messages from the consumer." default:"60"`
 	MaxBackoffSteps        int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
 	RetryConnection        int     `long:"retry-connection" description:"Maxiumum retry connections before failing, zero or less implies infinite" default:"0"`
 	RetryConnectionTimeout int     `long:"retry-connection-timeout" description:"Sleep time between connection retry in seconds" default:"1"`
-	MaxConnectionAge       int     `long:"max-connection-age" description:"Max lifespan of a websocket connection in seconds" default:"60"`
+	MaxConnectionAge       int     `long:"max-connection-age" description:"Max lifespan of a websocket connection in seconds" default:"600"`
 	Verbosity              int     `long:"verbosity" short:"v" description:"Set the glog logging verbosity" default:"0"`
 	Username               string  `long:"username" description:"Username to use when connecting to the consumer"`
 	Password               string  `long:"password" description:"Password to use when connecting to the consumer"`
@@ -71,6 +74,10 @@ func ParseShipperConfig() (*ShipperConfig, error) {
 	// Replace any remaining zero-value entries with defaults
 	mergo.Merge(commandlineopts, *defaultopts)
 
+	encoding := strings.ToLower(commandlineopts.Encoding)
+	if encoding != "json" && encoding != "binary" {
+		return nil, fmt.Errorf("Invalid encoding: %s", commandlineopts.Encoding)
+	}
 	glog.SetVerbosity(commandlineopts.Verbosity)
 
 	return commandlineopts, nil

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"sync"
 )
 
@@ -33,27 +34,28 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
 		tag_val     int32
 		change      bool
 	)
-	dict := make(map[int32]string)
+	dict := make(map[string]string)
 	buf := new(bytes.Buffer)
 	// Write the number of metrics (this could probably be 8-bit)
 	binary.Write(buf, binary.BigEndian, int16(len(batch.Metrics)))
 	for _, metric := range batch.Metrics {
 		binary.Write(buf, binary.BigEndian, metric.Timestamp)
 		if metric_name, change = d.get(metric.Metric); change {
-			dict[metric_name] = metric.Metric
+			dict[fmt.Sprintf("%d", metric_name)] = metric.Metric
 		}
 		binary.Write(buf, binary.BigEndian, metric_name)
+		binary.Write(buf, binary.BigEndian, metric.Value)
 		// Write the number of tags
 		binary.Write(buf, binary.BigEndian, int8(len(metric.Tags)))
 		for k, v := range metric.Tags {
 			if tag_key, change = d.get(k); change {
-				dict[tag_key] = k
+				dict[fmt.Sprintf("%d", tag_key)] = k
 			}
 			binary.Write(buf, binary.BigEndian, tag_key)
 			// This is still an interface{} for some reason
 			s := v.(string)
 			if tag_val, change = d.get(s); change {
-				dict[tag_val] = s
+				dict[fmt.Sprintf("%d", tag_val)] = s
 			}
 			binary.Write(buf, binary.BigEndian, tag_val)
 		}
