@@ -11,11 +11,11 @@ import (
 
 type dictionary struct {
 	sync.Mutex
-	last  uint32
-	trans map[string]uint32
+	last  int32
+	trans map[string]int32
 }
 
-func (d *dictionary) get(s string) (uint32, bool) {
+func (d *dictionary) get(s string) (int32, bool) {
 	if val, ok := d.trans[s]; ok {
 		return val, false
 	}
@@ -28,15 +28,15 @@ func (d *dictionary) get(s string) (uint32, bool) {
 
 func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
 	var (
-		metric_name uint32
-		tag_key     uint32
-		tag_val     uint32
+		metric_name int32
+		tag_key     int32
+		tag_val     int32
 		change      bool
 	)
-	dict := make(map[uint32]string)
+	dict := make(map[int32]string)
 	buf := new(bytes.Buffer)
 	// Write the number of metrics (this could probably be 8-bit)
-	binary.Write(buf, binary.BigEndian, uint16(len(batch.Metrics)))
+	binary.Write(buf, binary.BigEndian, int16(len(batch.Metrics)))
 	for _, metric := range batch.Metrics {
 		binary.Write(buf, binary.BigEndian, metric.Timestamp)
 		if metric_name, change = d.get(metric.Metric); change {
@@ -44,7 +44,7 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
 		}
 		binary.Write(buf, binary.BigEndian, metric_name)
 		// Write the number of tags
-		binary.Write(buf, binary.BigEndian, uint8(len(metric.Tags)))
+		binary.Write(buf, binary.BigEndian, int8(len(metric.Tags)))
 		for k, v := range metric.Tags {
 			if tag_key, change = d.get(k); change {
 				dict[tag_key] = k
