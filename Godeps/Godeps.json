@@ -1,10 +1,15 @@
 {
 	"ImportPath": "github.com/zenoss/metricshipper",
-	"GoVersion": "go1.3.1",
+	"GoVersion": "go1.3.3",
 	"Packages": [
 		"./..."
 	],
 	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/snappy-go/snappy",
+			"Comment": "null-15",
+			"Rev": "12e4b4183793ac4b061921e7980845e750679fd0"
+		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/redis",
 			"Rev": "6628c86d6a89ce7983c7c9b5e98c1df795fbd256"

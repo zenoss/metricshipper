@@ -2,6 +2,7 @@ package metricshipper
 
 import (
 	"bytes"
+	"code.google.com/p/snappy-go/snappy"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -67,5 +68,7 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
 		return nil, err
 	}
 	buf.Write(changes)
-	return buf.Bytes(), nil
+
+	result := []byte{}
+	return snappy.Encode(result, buf.Bytes())
 }
