@@ -61,7 +61,7 @@ func startServer() {
 }
 
 func TestConnectFail(t *testing.T) {
-	pub, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss")
+	pub, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -73,7 +73,7 @@ func TestConnectFail(t *testing.T) {
 func TestConnect(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss")
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -85,7 +85,7 @@ func TestConnect(t *testing.T) {
 func TestPublishOne(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss")
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -98,7 +98,7 @@ func TestPublishOne(t *testing.T) {
 func TestHitBatchSize(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, 999, "admin", "zenoss")
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, 999, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -114,7 +114,7 @@ func TestHitBatchSize(t *testing.T) {
 func TestHitBatchTimeout(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, 999, "admin", "zenoss")
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, 999, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
