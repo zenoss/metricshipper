@@ -28,7 +28,7 @@ func (d *dictionary) get(s string) (int32, bool) {
 	return d.last, true
 }
 
-func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
+func (batch *MetricBatch) MarshalBinary(d *dictionary, doSnappy bool) ([]byte, error) {
 	var (
 		metric_name int32
 		tag_key     int32
@@ -69,6 +69,10 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary) ([]byte, error) {
 	}
 	buf.Write(changes)
 
-	result := []byte{}
-	return snappy.Encode(result, buf.Bytes())
+	if doSnappy {
+		result := []byte{}
+		return snappy.Encode(result, buf.Bytes())
+	}
+
+	return buf.Bytes(), nil
 }

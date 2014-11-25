@@ -161,7 +161,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes i
 	case "json":
 		bytes, err = websocket.JSON.Send(conn, batch)
 	case "binary":
-		msg, err := batch.MarshalBinary(w.conn_dicts[conn])
+		msg, err := batch.MarshalBinary(w.conn_dicts[conn], true)
 		if err != nil {
 			return num, bytes, err
 		}
