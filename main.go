@@ -29,6 +29,7 @@ func main() {
 	// Get us some configuration
 	config, err := metricshipper.ParseShipperConfig()
 	if err != nil {
+		glog.Errorf("Unable to parse config: %s", err)
 		os.Exit(1)
 	}
 

@@ -68,17 +68,23 @@ func ParseShipperConfig() (*ShipperConfig, error) {
 	// Parse the options with no arguments to get defaults
 	flags.ParseArgs(defaultopts, make([]string, 0))
 
-	// Replace zero-value entries in command-line opts with config file values
-	mergo.Merge(commandlineopts, *cfgfileopts)
+	// Set runtimeopts to defaults
+	runtimeopts := defaultopts
 
-	// Replace any remaining zero-value entries with defaults
-	mergo.Merge(commandlineopts, *defaultopts)
+	// Replace runtimeopts with non-zero config file values
+	mergo.Merge(runtimeopts, *cfgfileopts)
 
-	encoding := strings.ToLower(commandlineopts.Encoding)
+	// Replace runtimeopts with non-zero commandline values
+	mergo.Merge(runtimeopts, *commandlineopts)
+
+	glog.V(1).Infof("runtime metricshipper options: %+v", runtimeopts)
+
+	// Validate encoding
+	encoding := strings.ToLower(runtimeopts.Encoding)
 	if encoding != "json" && encoding != "binary" {
-		return nil, fmt.Errorf("Invalid encoding: %s", commandlineopts.Encoding)
+		return nil, fmt.Errorf("Invalid encoding: %s", runtimeopts.Encoding)
 	}
-	glog.SetVerbosity(commandlineopts.Verbosity)
+	glog.SetVerbosity(runtimeopts.Verbosity)
 
-	return commandlineopts, nil
+	return runtimeopts, nil
 }
