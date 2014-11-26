@@ -46,6 +46,11 @@
 #
 #maxconnectionage: 60
 
+# Encoding to use for published metrics ("binary" or "json"). Default is
+# binary.
+#
+#encoding: binary
+
 # Rolling time period in seconds to consider slow-down messages from the
 # consumer.
 #
