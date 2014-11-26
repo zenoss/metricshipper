@@ -37,6 +37,8 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary, doSnappy bool) ([]byte, e
 	)
 	dict := make(map[string]string)
 	buf := new(bytes.Buffer)
+	// Write the API version
+	binary.Write(buf, binary.BigEndian, int8(0))
 	// Write the number of metrics (this could probably be 8-bit)
 	binary.Write(buf, binary.BigEndian, int16(len(batch.Metrics)))
 	for _, metric := range batch.Metrics {
