@@ -17,7 +17,7 @@ type ShipperConfig struct {
 	ConfigFilePath         string  `long:"config" short:"c" description:"Path to configuration file"`
 	RedisUrl               string  `long:"redis-url" description:"Redis URL to subscribe to" default:"redis://localhost:6379/0/metrics"`
 	Readers                int     `long:"readers" description:"Maximum number of simultaneous readers from Redis" default:"2"`
-	ConsumerUrl            string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8443/ws/metrics/store"`
+	ConsumerUrl            string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8080/ws/metrics/store"`
 	Writers                int     `long:"writers" description:"Maximum number of simultaneous writers to the consumer" default:"1"`
 	MaxBufferSize          int     `long:"max-buffer-size" description:"Maximum number of messages to keep in the internal buffer" default:"1024"`
 	MaxBatchSize           int     `long:"max-batch-size" description:"Number of messages to send to the consumer in a single web socket call. This should be smaller than the buffer size." default:"64"`

@@ -56,7 +56,7 @@ func (batch *MetricBatch) MarshalBinary(d *dictionary, doSnappy bool) ([]byte, e
 			}
 			binary.Write(buf, binary.BigEndian, tag_key)
 			// This is still an interface{} for some reason
-			s := v.(string)
+			s := fmt.Sprintf("%v", v)
 			if tag_val, change = d.get(s); change {
 				dict[fmt.Sprintf("%d", tag_val)] = s
 			}
