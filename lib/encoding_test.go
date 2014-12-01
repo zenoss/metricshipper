@@ -9,6 +9,31 @@ import (
 	"testing"
 )
 
+func testMarshalBinary(t *testing.T, mb *MetricBatch, isSnappy bool, expectedFilename string) {
+	dict := &dictionary{trans: make(map[string]int32)}
+	actual, err := mb.MarshalBinary(dict, isSnappy)
+	if err != nil {
+		t.Fatalf("unable to marshal binary %s", err)
+	}
+
+	if false { // leave this as convenience to generate the expected file when things change
+		if err := ioutil.WriteFile(expectedFilename, actual, 0644); err != nil {
+			t.Fatalf("unable to write to file %s %s", expectedFilename, err)
+		} else {
+			glog.Infof("wrote marshalled metrics to file: %s\n%s", expectedFilename, hex.Dump(actual))
+		}
+	}
+
+	expected, err := ioutil.ReadFile(expectedFilename)
+	if err != nil {
+		t.Fatalf("unable to read file %s %s", expectedFilename, err)
+	}
+
+	if 0 != bytes.Compare(expected, actual) {
+		t.Fatalf("expected does not match actual\n%s\n%s", hex.Dump(expected), hex.Dump(actual))
+	}
+}
+
 func TestMarshalBinary(t *testing.T) {
 	buf := make([]Metric, 0)
 	mb := &MetricBatch{
@@ -19,27 +44,7 @@ func TestMarshalBinary(t *testing.T) {
 	buf = append(buf, Metric{Timestamp: 7.0, Metric: "baz", Value: 11.0})
 	mb.Metrics = buf
 
-	dict := &dictionary{trans: make(map[string]int32)}
-	actual, err := mb.MarshalBinary(dict, false)
-	if err != nil {
-		t.Fatalf("unable to marshal binary %s", err)
-	}
+	testMarshalBinary(t, mb, false, "encoding_test.raw")
+	testMarshalBinary(t, mb, true, "encoding_test.snappy")
 
-	expfile := "encoding_test.expected"
-	if false { // leave this as convenience to generate the expected file when things change
-		if err := ioutil.WriteFile(expfile, actual, 0644); err != nil {
-			t.Fatalf("unable to write to file %s %s", expfile, err)
-		} else {
-			glog.Infof("wrote marshalled metrics to file: %s\n%s", expfile, hex.Dump(actual))
-		}
-	}
-
-	expected, err := ioutil.ReadFile(expfile)
-	if err != nil {
-		t.Fatalf("unable to read file %s %s", expfile, err)
-	}
-
-	if 0 != bytes.Compare(expected, actual) {
-		t.Fatalf("expected does not match actual\n%s\n%s", hex.Dump(expected), hex.Dump(actual))
-	}
 }
