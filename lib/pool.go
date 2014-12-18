@@ -22,11 +22,10 @@ func (conn *WebSocketConn) Close() {
 }
 
 type WebSocketConnPool struct {
-	delay   time.Duration
-	maxage  time.Duration
-	config  *websocket.Config
-	pool    chan *WebSocketConn
-	discard chan *WebSocketConn
+	delay  time.Duration
+	maxage time.Duration
+	config *websocket.Config
+	pool   chan *WebSocketConn
 }
 
 func (pool *WebSocketConnPool) newWebSocket() *WebSocketConn {
@@ -78,7 +77,7 @@ func (pool *WebSocketConnPool) Put(conn *WebSocketConn) {
 	if conn.closed {
 		pool.Release(conn)
 	} else if !conn.expires.IsZero() && time.Now().After(conn.expires) {
-		glog.V(2).Infof("Connection is older than %d seconds; closing", pool.maxage.Seconds())
+		glog.V(1).Infof("Connection is older than %d seconds; closing", pool.maxage.Seconds())
 		pool.Release(conn)
 	} else {
 		pool.pool <- conn
