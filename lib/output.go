@@ -24,9 +24,9 @@ type WebsocketPublisher struct {
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
-	batch_size int, batch_timeout float64, retry_connection int,
-	retry_connection_timeout time.Duration, max_connection_age time.Duration,
-	username string, password string, encoding string) (publisher *WebsocketPublisher, err error) {
+	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
+	max_connection_age time.Duration, username string, password string,
+	encoding string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
