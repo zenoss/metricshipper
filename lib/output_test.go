@@ -61,24 +61,36 @@ func startServer() {
 }
 
 func TestConnectFail(t *testing.T) {
-	pub, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
-	if err != nil {
-		t.Fatalf("Could not create websocket publisher: %s", err)
-	}
-	if err := pub.Start(); err == nil {
-		t.Errorf("Unable to connect: %s", err)
+	connected := make(chan bool)
+	go func() {
+		_, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
+		if err != nil {
+			t.Fatalf("Could not create websocket publisher: %s", err)
+		}
+		connected <- true
+	}()
+	select {
+	case <-time.After(1 * time.Second):
+	case <-connected:
+		t.Error("Publisher connected with an invalid address")
 	}
 }
 
 func TestConnect(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
-	if err != nil {
-		t.Fatalf("Could not create websocket publisher: %s", err)
-	}
-	if err := pub.Start(); err != nil {
-		t.Error("Unable to connect: %s", err)
+	connected := make(chan bool)
+	go func() {
+		_, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json")
+		if err != nil {
+			t.Fatalf("Could not create websocket publisher: %s", err)
+		}
+		connected <- true
+	}()
+	select {
+	case <-connected:
+	case <-time.After(1 * time.Second):
+		t.Fatal("Was unable to connect to valid consumer service in 1 second")
 	}
 }
 
@@ -89,7 +101,6 @@ func TestPublishOne(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
-	go pub.Start()
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(1, "Didn't receive single metric", t)
@@ -102,7 +113,6 @@ func TestHitBatchSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
-	go pub.Start()
 	stageMetrics(2, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(0, "Sent batch early", t)
@@ -118,7 +128,6 @@ func TestHitBatchTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
-	go pub.Start()
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(0, "Sent batch early", t)
