@@ -25,7 +25,6 @@ type ShipperConfig struct {
 	Encoding               string  `long:"encoding" description:"Encoding for metric publishing (valid values are 'json' or 'binary')" default:"binary"`
 	BackoffWindow          int     `long:"backoff-window-seconds" description:"Rolling time period in seconds to consider collision messages from the consumer." default:"60"`
 	MaxBackoffSteps        int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"16"`
-	RetryConnection        int     `long:"retry-connection" description:"Maxiumum retry connections before failing, zero or less implies infinite" default:"0"`
 	RetryConnectionTimeout int     `long:"retry-connection-timeout" description:"Sleep time between connection retry in seconds" default:"1"`
 	MaxConnectionAge       int     `long:"max-connection-age" description:"Max lifespan of a websocket connection in seconds" default:"600"`
 	Verbosity              int     `long:"verbosity" short:"v" description:"Set the glog logging verbosity" default:"0"`
