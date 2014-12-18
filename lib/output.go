@@ -124,22 +124,20 @@ func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 	msg := bufferPool.Get().([]byte)
 	defer bufferPool.Put(msg)
 	for {
-		x := msg[:]
 		n := 0
 		deadline := time.Now().Add(time.Microsecond)
 		err = conn.conn.SetReadDeadline(deadline)
 
-		if n, err = conn.conn.Read(x); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
+		if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
 			conn.Close()
 			break
 		}
 
 		err = nil
-		x = x[0:n]
 		if n == 0 {
 			break
 		}
-		glog.V(2).Infof("Server responded with message: %s", string(x))
+		glog.V(2).Infof("Server responded with message: %s", string(msg[0:n]))
 	}
 
 	return err
