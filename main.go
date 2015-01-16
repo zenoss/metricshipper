@@ -45,8 +45,7 @@ func main() {
 	w, err := metricshipper.NewWebsocketPublisher(config.ConsumerUrl,
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, time.Duration(config.RetryConnectionTimeout)*time.Second,
-		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding,
-		config.BackoffWindow, config.MaxBackoffSteps)
+		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return

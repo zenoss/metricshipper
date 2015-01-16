@@ -29,12 +29,12 @@
 
 # Maximum number of messages to keep in the internal buffer.
 #
-#maxbuffersize: 1024
+#maxbuffersize: 1048576
 
 # Maximum number of messages to send to the consumer in a single batch.
 # This should be smaller than the setting for maxbuffersize.
 #
-#maxbatchsize: 64
+#maxbatchsize: 65536
 
 # Maximum time in seconds to wait for messages from the internal buffer to
 # be ready before sending a batch to the consumer.
@@ -50,15 +50,6 @@
 # binary.
 #
 #encoding: binary
-
-# Rolling time period in seconds to consider slow-down messages from the
-# consumer.
-#
-#backoffwindow: 60
-
-# Maximum number of slow-down messages to consider for exponential backoff.
-#
-#maxbackoffsteps: 16
 
 # Number of processors to use.
 #
