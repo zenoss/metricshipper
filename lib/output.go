@@ -2,6 +2,7 @@ package metricshipper
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -21,12 +22,13 @@ type WebsocketPublisher struct {
 	Outgoing           chan Metric
 	OutgoingDatapoints metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes      metrics.Meter // number of bytes written to websocket endpoint
+	backoff            *Backoff
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
 	max_connection_age time.Duration, username string, password string,
-	encoding string) (publisher *WebsocketPublisher, err error) {
+	encoding string, window, maxcollisions int) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -51,6 +53,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:           make(chan Metric, buffer_size),
 		OutgoingDatapoints: outgoingDatapoints,
 		OutgoingBytes:      outgoingBytes,
+		backoff:            NewBackoff(window, maxcollisions, concurrency),
 	}
 
 	// Block until at least one connection has been established
@@ -137,9 +140,15 @@ func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 		if n == 0 {
 			break
 		}
-		glog.V(2).Infof("Server responded with message: %s", string(msg[0:n]))
+		dmsg := make(map[string]string)
+		if err := json.Unmarshal(msg[0:n], &dmsg); err != nil {
+			return err
+		}
+		if dmsg["type"] == "LOW_COLLISION" {
+			w.backoff.Collision()
+		}
+		glog.V(2).Infof("Server responded with message: %v", dmsg)
 	}
-
 	return err
 }
 
@@ -149,6 +158,7 @@ func (w *WebsocketPublisher) DoBatch() {
 		num, batch := w.getBatch()
 		if num > 0 {
 			for {
+				w.backoff.Wait()
 				metrics, bytes, err := w.sendBatch(batch)
 				if err == nil {
 					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
