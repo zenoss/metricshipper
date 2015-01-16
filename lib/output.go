@@ -3,6 +3,7 @@ package metricshipper
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -16,19 +17,20 @@ var origin string = "http://localhost"
 
 type WebsocketPublisher struct {
 	pool               *WebSocketConnPool
+	max_batch_size     int
 	batch_size         int
 	batch_timeout      float64
 	encoding           string
 	Outgoing           chan Metric
 	OutgoingDatapoints metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes      metrics.Meter // number of bytes written to websocket endpoint
-	backoff            *Backoff
+	sync.Mutex
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
 	max_connection_age time.Duration, username string, password string,
-	encoding string, window, maxcollisions int) (publisher *WebsocketPublisher, err error) {
+	encoding string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -47,13 +49,13 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	pool := NewWebSocketConnPool(concurrency, retry_connection_timeout, max_connection_age, config)
 	publisher = &WebsocketPublisher{
 		pool:               pool,
-		batch_size:         batch_size,
+		max_batch_size:     batch_size,
+		batch_size:         1,
 		batch_timeout:      batch_timeout,
 		encoding:           encoding,
 		Outgoing:           make(chan Metric, buffer_size),
 		OutgoingDatapoints: outgoingDatapoints,
 		OutgoingBytes:      outgoingBytes,
-		backoff:            NewBackoff(window, maxcollisions, concurrency),
 	}
 
 	// Block until at least one connection has been established
@@ -126,28 +128,53 @@ var bufferPool = &sync.Pool{
 func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 	msg := bufferPool.Get().([]byte)
 	defer bufferPool.Put(msg)
+	block := true
+	backoff := false
 	for {
 		n := 0
-		deadline := time.Now().Add(time.Microsecond)
-		err = conn.conn.SetReadDeadline(deadline)
-
-		if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
-			conn.Close()
-			break
+		if block {
+			deadline := time.Now().Add(10 * time.Second)
+			conn.conn.SetReadDeadline(deadline)
+			if n, err = conn.conn.Read(msg); err != nil {
+				conn.Close()
+				break
+			}
+			block = false
+		} else {
+			deadline := time.Now().Add(time.Microsecond)
+			conn.conn.SetReadDeadline(deadline)
+			if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
+				conn.Close()
+				break
+			}
+			err = nil
 		}
 
-		err = nil
 		if n == 0 {
 			break
 		}
 		dmsg := make(map[string]string)
 		if err := json.Unmarshal(msg[0:n], &dmsg); err != nil {
-			return err
+			break
 		}
-		if dmsg["type"] == "LOW_COLLISION" {
-			w.backoff.Collision()
+		if dmsg["type"] == "DROPPED" {
+			err = errors.New(dmsg["value"])
+			break
+		}
+		if dmsg["type"] == "ERROR" {
+			err = errors.New(dmsg["value"])
+			conn.Close()
+			break
+		}
+		if dmsg["type"] == "LOW_COLLISION" || dmsg["type"] == "HIGH_COLLISION" {
+			backoff = true
 		}
 		glog.V(2).Infof("Server responded with message: %v", dmsg)
+	}
+	if backoff || (err != nil) {
+		w.Backoff()
+	} else {
+		w.Speedup()
 	}
 	return err
 }
@@ -158,7 +185,6 @@ func (w *WebsocketPublisher) DoBatch() {
 		num, batch := w.getBatch()
 		if num > 0 {
 			for {
-				w.backoff.Wait()
 				metrics, bytes, err := w.sendBatch(batch)
 				if err == nil {
 					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
@@ -172,6 +198,26 @@ func (w *WebsocketPublisher) DoBatch() {
 					glog.Errorf("Failed sending %d metrics to the consumer: %s", num, err)
 				}
 			}
+		}
+	}
+}
+
+func (w *WebsocketPublisher) Backoff() {
+	w.Lock()
+	defer w.Unlock()
+	w.batch_size /= 2
+	if w.batch_size < 1 {
+		w.batch_size = 1
+	}
+}
+
+func (w *WebsocketPublisher) Speedup() {
+	if w.batch_size < w.max_batch_size {
+		w.Lock()
+		defer w.Unlock()
+		w.batch_size += 1
+		if w.batch_size > w.max_batch_size {
+			w.batch_size = w.max_batch_size
 		}
 	}
 }
