@@ -3,6 +3,7 @@ package metricshipper
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -126,17 +127,27 @@ var bufferPool = &sync.Pool{
 func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 	msg := bufferPool.Get().([]byte)
 	defer bufferPool.Put(msg)
+	block := true
 	for {
 		n := 0
-		deadline := time.Now().Add(time.Microsecond)
-		err = conn.conn.SetReadDeadline(deadline)
-
-		if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
-			conn.Close()
-			break
+		if block {
+			deadline := time.Now().Add(10 * time.Second)
+			conn.conn.SetReadDeadline(deadline)
+			if n, err = conn.conn.Read(msg); err != nil {
+				conn.Close()
+				break
+			}
+			block = false
+		} else {
+			deadline := time.Now().Add(time.Microsecond)
+			conn.conn.SetReadDeadline(deadline)
+			if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
+				conn.Close()
+				break
+			}
+			err = nil
 		}
 
-		err = nil
 		if n == 0 {
 			break
 		}
@@ -144,8 +155,17 @@ func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 		if err := json.Unmarshal(msg[0:n], &dmsg); err != nil {
 			return err
 		}
-		if dmsg["type"] == "LOW_COLLISION" {
+		if dmsg["type"] == "LOW_COLLISION" || dmsg["type"] == "HIGH_COLLISION" {
 			w.backoff.Collision()
+		} else if dmsg["type"] == "DROPPED" {
+			err = errors.New(dmsg["value"])
+			w.backoff.Collision()
+			break
+		} else if dmsg["type"] == "ERROR" {
+			err = errors.New(dmsg["value"])
+			w.backoff.Collision()
+			conn.Close()
+			break
 		}
 		glog.V(2).Infof("Server responded with message: %v", dmsg)
 	}
