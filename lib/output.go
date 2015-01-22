@@ -27,7 +27,7 @@ type WebsocketPublisher struct {
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
 	max_connection_age time.Duration, username string, password string,
-	encoding string, window, maxcollisions, maxdelay int) (publisher *WebsocketPublisher, err error) {
+	encoding string, maxcollisions, maxdelay int) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -59,7 +59,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 
 	// Now it's cool to open the gates
 	for i := 0; i < concurrency; i++ {
-		go publisher.DoBatch(NewBackoff(window, maxcollisions, maxdelay))
+		go publisher.DoBatch(NewBackoff(maxcollisions, maxdelay))
 	}
 	return publisher, nil
 }
@@ -143,7 +143,7 @@ func (w *WebsocketPublisher) readResponse(conn *WebSocketConn, backoff *Backoff)
 			return err
 		}
 		if strings.HasSuffix(dmsg["type"], "COLLISION") || dmsg["type"] == "DROPPED" {
-			backoff.Collision()
+			backoff.Backoff()
 		}
 		glog.V(2).Infof("Server responded with message: %v", dmsg)
 	}

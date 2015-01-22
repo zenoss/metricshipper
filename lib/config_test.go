@@ -39,8 +39,8 @@ func TestParseEverything(t *testing.T) {
 		"maxbuffersize":   1234,
 		"maxbatchsize":    4321,
 		"batchtimeout":    float64(1000),
-		"backoffwindow":   31415,
 		"maxbackoffsteps": 1123,
+		"maxbackoffdelay": 3321,
 	}
 	testConfigValues(config, t)
 }
