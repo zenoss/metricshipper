@@ -22,13 +22,12 @@ type WebsocketPublisher struct {
 	Outgoing           chan Metric
 	OutgoingDatapoints metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes      metrics.Meter // number of bytes written to websocket endpoint
-	backoff            *Backoff
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
 	max_connection_age time.Duration, username string, password string,
-	encoding string, window, maxcollisions int) (publisher *WebsocketPublisher, err error) {
+	encoding string, window, maxcollisions, maxdelay int) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -53,7 +52,6 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:           make(chan Metric, buffer_size),
 		OutgoingDatapoints: outgoingDatapoints,
 		OutgoingBytes:      outgoingBytes,
-		backoff:            NewBackoff(window, maxcollisions, concurrency),
 	}
 
 	// Block until at least one connection has been established
@@ -61,7 +59,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 
 	// Now it's cool to open the gates
 	for i := 0; i < concurrency; i++ {
-		go publisher.DoBatch()
+		go publisher.DoBatch(NewBackoff(window, maxcollisions, maxdelay))
 	}
 	return publisher, nil
 }
@@ -89,7 +87,7 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
 	return len(buf), batch
 }
 
-func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes int, err error) {
+func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (metricCount, bytes int, err error) {
 	var num int
 	if batch != nil {
 		num = len(batch.Metrics)
@@ -113,7 +111,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch) (metricCount, bytes i
 		conn.Close()
 		return num, bytes, err
 	}
-	return num, bytes, w.readResponse(conn)
+	return num, bytes, w.readResponse(conn, backoff)
 }
 
 var bufferPool = &sync.Pool{
@@ -123,7 +121,7 @@ var bufferPool = &sync.Pool{
 }
 
 //read everything in the response buffer
-func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
+func (w *WebsocketPublisher) readResponse(conn *WebSocketConn, backoff *Backoff) (err error) {
 	msg := bufferPool.Get().([]byte)
 	defer bufferPool.Put(msg)
 	for {
@@ -144,22 +142,22 @@ func (w *WebsocketPublisher) readResponse(conn *WebSocketConn) (err error) {
 		if err := json.Unmarshal(msg[0:n], &dmsg); err != nil {
 			return err
 		}
-		if dmsg["type"] == "LOW_COLLISION" {
-			w.backoff.Collision()
+		if strings.HasSuffix(dmsg["type"], "COLLISION") || dmsg["type"] == "DROPPED" {
+			backoff.Collision()
 		}
 		glog.V(2).Infof("Server responded with message: %v", dmsg)
 	}
 	return err
 }
 
-func (w *WebsocketPublisher) DoBatch() {
+func (w *WebsocketPublisher) DoBatch(backoff *Backoff) {
 	for {
 		// Retry loop
 		num, batch := w.getBatch()
 		if num > 0 {
 			for {
-				w.backoff.Wait()
-				metrics, bytes, err := w.sendBatch(batch)
+				backoff.Wait()
+				metrics, bytes, err := w.sendBatch(batch, backoff)
 				if err == nil {
 					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
 
