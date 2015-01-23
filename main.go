@@ -46,7 +46,7 @@ func main() {
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, time.Duration(config.RetryConnectionTimeout)*time.Second,
 		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding,
-		config.BackoffWindow, config.MaxBackoffSteps)
+		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return

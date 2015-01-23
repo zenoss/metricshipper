@@ -11,16 +11,18 @@ import (
 type Backoff struct {
 	window      time.Duration
 	max         int
+        maxDelay    float64
+        base        float64
 	collisions  float64
-	concurrency float64
 	sync.Mutex
 }
 
-func NewBackoff(window, max, concurrency int) *Backoff {
+func NewBackoff(window, maxCollisions, maxDelay int) *Backoff {
 	return &Backoff{
 		window:      time.Duration(window) * time.Second,
-		max:         max,
-		concurrency: float64(concurrency),
+		max:         maxCollisions,
+                maxDelay:    float64(maxDelay),
+                base:        math.Pow(2.0, 1/float64(maxCollisions)),
 	}
 }
 
@@ -43,7 +45,7 @@ func (b *Backoff) Wait() {
 	if b.collisions == 0 {
 		return
 	}
-	interval := time.Duration((math.Pow(2, b.collisions/b.concurrency) - 1) / 2 * 1000)
+	interval := time.Duration(b.maxDelay * (math.Pow(b.base, b.collisions) - 1))
 	glog.V(2).Infof("Waiting %dms before sending next batch", interval)
 	<-time.After(interval * time.Millisecond)
 }
