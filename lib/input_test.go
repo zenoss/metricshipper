@@ -293,7 +293,7 @@ func TestSubscribe(t *testing.T) {
 	}
 
 	// Give subscriber some cycles to read
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Check the length now, should have been read
 	llen, err = redis.Int(conn.Do("LLEN", queue_name))

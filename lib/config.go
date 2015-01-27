@@ -23,9 +23,6 @@ type ShipperConfig struct {
 	MaxBatchSize           int     `long:"max-batch-size" description:"Number of messages to send to the consumer in a single web socket call. This should be smaller than the buffer size." default:"64"`
 	BatchTimeout           float64 `long:"batch-timeout-seconds" description:"Maximum time in seconds to wait for messages from the internal buffer to be ready before making a web socket call with current metrics." default:"1"`
 	Encoding               string  `long:"encoding" description:"Encoding for metric publishing (valid values are 'json' or 'binary')" default:"binary"`
-	BackoffWindow          int     `long:"backoff-window-seconds" description:"Rolling time period in seconds to consider collision messages from the consumer." default:"60"`
-	MaxBackoffSteps        int     `long:"max-backoff-steps" description:"Maximum number of collisions to consider for exponential backoff." default:"1200"`
-	MaxBackoffDelay        int     `long:"max-backoff-delay" description:"Maximum milliseconds per request to wait due to backoff (worst case)." default:"10000"`
 	RetryConnectionTimeout int     `long:"retry-connection-timeout" description:"Sleep time between connection retry in seconds" default:"1"`
 	MaxConnectionAge       int     `long:"max-connection-age" description:"Max lifespan of a websocket connection in seconds" default:"600"`
 	Verbosity              int     `long:"verbosity" short:"v" description:"Set the glog logging verbosity" default:"0"`

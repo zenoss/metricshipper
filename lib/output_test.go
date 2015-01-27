@@ -2,9 +2,11 @@ package metricshipper
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -48,7 +50,7 @@ func consumerHandler(ws *websocket.Conn) {
 func assertBufferSize(expected int, msg string, t *testing.T) {
 	actual := len(buf)
 	if actual != expected {
-		t.Error(msg)
+		t.Error(msg + fmt.Sprintf("(Expected: %d, Actual: %d)", expected, actual))
 	}
 }
 
@@ -60,10 +62,41 @@ func startServer() {
 	log.Print("Test server listening on ", serverAddr)
 }
 
+var mockPollForFreeBuffer = func(conn *WebSocketConn) bool {
+	return false
+}
+
+var mockBatchLimit = func(w *WebsocketPublisher, conn *WebSocketConn) int {
+	return w.batch_size
+}
+
+var mockReadWebsocket = func(msg []byte, conn *WebSocketConn) (int, error) {
+	lotsaBuffer := "{\"type\":\"BUFFER_UPDATE\",\"value\":\"1000000\"}"
+	copy(msg, "{\"type\":\"BUFFER_UPDATE\",\"value\":\"1000000\"}")
+	return len(lotsaBuffer), nil
+}
+
+var originalPollForFreeBuffer = pollForFreeBuffer
+var originalReadWebsocket = readWebsocket
+var originalBatchLimit = batchLimit
+
+func TestMain(m *testing.M) {
+	once.Do(startServer)
+	batchLimit = mockBatchLimit
+	pollForFreeBuffer = mockPollForFreeBuffer
+	readWebsocket = mockReadWebsocket
+	defer func() {
+		batchLimit = originalBatchLimit
+		pollForFreeBuffer = originalPollForFreeBuffer
+		readWebsocket = originalReadWebsocket
+	}()
+	os.Exit(m.Run())
+}
+
 func TestConnectFail(t *testing.T) {
 	connected := make(chan bool)
 	go func() {
-		_, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+		_, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 999*time.Second, "admin", "zenoss", "json")
 		if err != nil {
 			t.Fatalf("Could not create websocket publisher: %s", err)
 		}
@@ -77,11 +110,10 @@ func TestConnectFail(t *testing.T) {
 }
 
 func TestConnect(t *testing.T) {
-	once.Do(startServer)
 	defer clearBuffer()
 	connected := make(chan bool)
 	go func() {
-		_, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+		_, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999*time.Second, "admin", "zenoss", "json")
 		if err != nil {
 			t.Fatalf("Could not create websocket publisher: %s", err)
 		}
@@ -95,9 +127,8 @@ func TestConnect(t *testing.T) {
 }
 
 func TestPublishOne(t *testing.T) {
-	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999*time.Second, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -107,9 +138,8 @@ func TestPublishOne(t *testing.T) {
 }
 
 func TestHitBatchSize(t *testing.T) {
-	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999*time.Second, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}
@@ -122,9 +152,8 @@ func TestHitBatchSize(t *testing.T) {
 }
 
 func TestHitBatchTimeout(t *testing.T) {
-	once.Do(startServer)
 	defer clearBuffer()
-	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999*time.Second, "admin", "zenoss", "json")
 	if err != nil {
 		t.Fatalf("Could not create websocket publisher: %s", err)
 	}

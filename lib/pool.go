@@ -8,10 +8,11 @@ import (
 )
 
 type WebSocketConn struct {
-	conn       *websocket.Conn // The underlying connection
-	expires    time.Time       // The expiration time of this connection
-	dictionary *dictionary     // Translation dictionary for binary encoding
-	closed     bool
+	receiveBuffer int64           // Cooperative estimate of available buffer space on receiver
+	conn          *websocket.Conn // The underlying connection
+	expires       time.Time       // The expiration time of this connection
+	dictionary    *dictionary     // Translation dictionary for binary encoding
+	closed        bool
 }
 
 func (conn *WebSocketConn) Close() {

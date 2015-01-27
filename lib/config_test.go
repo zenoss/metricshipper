@@ -32,15 +32,13 @@ func testConfigValues(config map[string]interface{}, t *testing.T) {
 
 func TestParseEverything(t *testing.T) {
 	config := map[string]interface{}{
-		"redisurl":        "http://testRedisUrl",
-		"readers":         123,
-		"consumerurl":     "http://testConsumerUrl",
-		"writers":         321,
-		"maxbuffersize":   1234,
-		"maxbatchsize":    4321,
-		"batchtimeout":    float64(1000),
-		"backoffwindow":   31415,
-		"maxbackoffsteps": 1123,
+		"redisurl":      "http://testRedisUrl",
+		"readers":       123,
+		"consumerurl":   "http://testConsumerUrl",
+		"writers":       321,
+		"maxbuffersize": 1234,
+		"maxbatchsize":  4321,
+		"batchtimeout":  float64(1000),
 	}
 	testConfigValues(config, t)
 }

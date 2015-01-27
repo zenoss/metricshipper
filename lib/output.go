@@ -3,6 +3,8 @@ package metricshipper
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,9 +27,9 @@ type WebsocketPublisher struct {
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
-	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
-	max_connection_age time.Duration, username string, password string,
-	encoding string, window, maxcollisions, maxdelay int) (publisher *WebsocketPublisher, err error) {
+	batch_size int, batch_timeout float64, retry_connection_timeout,
+	max_connection_age time.Duration, username, password,
+	encoding string) (publisher *WebsocketPublisher, err error) {
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -59,43 +61,44 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 
 	// Now it's cool to open the gates
 	for i := 0; i < concurrency; i++ {
-		go publisher.DoBatch(NewBackoff(window, maxcollisions, maxdelay))
+		go publisher.DoBatch()
 	}
 	return publisher, nil
 }
 
-func (w *WebsocketPublisher) getBatch() (int, *MetricBatch) {
-	glog.V(3).Infof("enter getBatch()")
+var batchLimit = func(w *WebsocketPublisher, conn *WebSocketConn) int {
+	if conn.receiveBuffer == 0 {
+		return 0
+	}
+	if conn.receiveBuffer > int64(w.batch_size) {
+		return w.batch_size
+	}
+	return int(conn.receiveBuffer)
+}
+
+func (w *WebsocketPublisher) getBatch(conn *WebSocketConn) *MetricBatch {
 	buf := make([]Metric, 0)
 	batch := &MetricBatch{
 		Metrics: buf,
 	}
-	defer glog.V(3).Infof("exit getBatch(), len(buf)=%d", len(buf))
-
-	remaining := w.batch_size - len(buf)
+	limit := batchLimit(w, conn)
 	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
-	for i := 0; i < remaining; i++ {
+	for i := 0; i < limit; i++ {
 		select {
 		case <-timer:
-			i = remaining // Break out of the loop
+			i = limit // Break out of the loop
 		case m := <-w.Outgoing:
 			buf = append(buf, m)
 		}
 	}
 	batch.Metrics = buf
-
-	return len(buf), batch
+	return batch
 }
 
-func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (metricCount, bytes int, err error) {
-	var num int
-	if batch != nil {
-		num = len(batch.Metrics)
-	}
-	conn := w.pool.Get()
-	defer w.pool.Put(conn)
-	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", w.pool.config.Location, len(batch.Metrics))
-	defer glog.V(3).Infof("exit sendBatch(), num=%d", num)
+func (w *WebsocketPublisher) sendBatch(conn *WebSocketConn, batch *MetricBatch) (metricCount, bytes int, err error) {
+	num := len(batch.Metrics)
+	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", w.pool.config.Location, num)
+	defer glog.V(3).Infof("exit sendBatch(), len(batch)=%d", num)
 
 	if glog.V(5) {
 		for _, m := range batch.Metrics {
@@ -109,7 +112,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (me
 	case "binary":
 		msg, err := batch.MarshalBinary(conn.dictionary, true)
 		if err != nil {
-			return 0, bytes, err
+			return 0, 0, err
 		}
 		bytes, err = websocket.Message.Send(conn.conn, msg)
 	}
@@ -117,7 +120,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (me
 		conn.Close()
 		return num, bytes, err
 	}
-	return num, bytes, w.readResponse(conn, backoff)
+	return num, bytes, nil
 }
 
 var bufferPool = &sync.Pool{
@@ -126,56 +129,130 @@ var bufferPool = &sync.Pool{
 	},
 }
 
+var readWebsocket = func(msg []byte, conn *WebSocketConn) (int, error) {
+	deadline := time.Now().Add(10 * time.Microsecond)
+	if err := conn.conn.SetReadDeadline(deadline); err != nil {
+		conn.Close()
+		return 0, err
+	}
+
+	if n, err := conn.conn.Read(msg); err != nil {
+		if strings.HasSuffix(err.Error(), "i/o timeout") {
+			return 0, nil
+		} else {
+			conn.Close()
+			return 0, err
+		}
+	} else {
+		return n, err
+	}
+}
+
 //read everything in the response buffer
-func (w *WebsocketPublisher) readResponse(conn *WebSocketConn, backoff *Backoff) (err error) {
+func (w *WebsocketPublisher) readResponse(conn *WebSocketConn, nonce string) (err error) {
 	msg := bufferPool.Get().([]byte)
 	defer bufferPool.Put(msg)
 	for {
 		n := 0
-		deadline := time.Now().Add(time.Microsecond)
-		err = conn.conn.SetReadDeadline(deadline)
-
-		if n, err = conn.conn.Read(msg); err != nil && !strings.HasSuffix(err.Error(), "i/o timeout") {
-			conn.Close()
-			break
-		}
-
-		err = nil
-		if n == 0 {
+		if n, err = readWebsocket(msg, conn); err != nil || n == 0 {
 			break
 		}
 		dmsg := make(map[string]string)
 		if err := json.Unmarshal(msg[0:n], &dmsg); err != nil {
 			return err
 		}
-		if strings.HasSuffix(dmsg["type"], "COLLISION") || dmsg["type"] == "DROPPED" {
-			backoff.Collision()
+		logged := false
+		switch dmsg["type"] {
+		case "OK":
+			//TODO: Switch to async
+		case "ERROR":
+			glog.Errorf("Server responded with message: %v", dmsg)
+			logged = true
+			conn.Close()
+			return errors.New("Server error: " + dmsg["value"])
+		case "DROPPED":
+			glog.Errorf("Server responded with message: %v", dmsg)
+			logged = true
+			//TODO: Switch to sync
+		case "MALFORMED_REQUEST":
+			glog.Errorf("Server responded with message: %v", dmsg)
+			logged = true
+		case "DATA_RECEIVED":
+			// ignored
+		case "BUFFER_UPDATE":
+			if bufferUpdate, err := strconv.ParseInt(dmsg["value"], 10, 64); err == nil {
+				conn.receiveBuffer = bufferUpdate
+			} else {
+				glog.Errorf("Buffer update parse error: %v", err)
+			}
+		case "PONG":
+			//TODO: Ignore in async mode. Otherwise...
+			//TODO: Stop looping and return if value matches our nonce.
 		}
-		glog.V(2).Infof("Server responded with message: %v", dmsg)
+		if !logged {
+			glog.V(2).Infof("Server responded with message: %v", dmsg)
+		}
 	}
 	return err
 }
 
-func (w *WebsocketPublisher) DoBatch(backoff *Backoff) {
-	for {
-		// Retry loop
-		num, batch := w.getBatch()
-		if num > 0 {
-			for {
-				backoff.Wait()
-				metrics, bytes, err := w.sendBatch(batch, backoff)
+var emptyBatch = &MetricBatch{
+	Metrics: make([]Metric, 0),
+}
+
+var pollForFreeBuffer = func(conn *WebSocketConn) bool {
+	return conn.receiveBuffer <= 0
+}
+
+func (w *WebsocketPublisher) getAndSendOneBatch() (metricCount, byteCount int) {
+	glog.V(3).Infof("enter getAndSendOneBatch()")
+	defer glog.V(3).Infof("exit getAndSendOneBatch()")
+
+	conn := w.pool.Get()
+	defer w.pool.Put(conn)
+
+	batch := w.getBatch(conn)
+	num := len(batch.Metrics)
+
+	if pollForFreeBuffer(conn) || num > 0 {
+		// Retry loop...
+		for {
+			if pollForFreeBuffer(conn) {
+				_, _, err := w.sendBatch(conn, emptyBatch)
 				if err == nil {
-					glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
-
-					// update meter with number of metrics sent
-					w.OutgoingDatapoints.Mark(int64(metrics))
-					w.OutgoingBytes.Mark(int64(bytes))
-
-					break
+					err = w.readResponse(conn, "")
+				}
+				if err != nil {
+					glog.Errorf("Failed polling consumer for a buffer update: %s", err)
+				} else {
+					glog.V(2).Info("Polled consumer for buffer update.")
+				}
+				if pollForFreeBuffer(conn) {
+					<-time.After(100 * time.Millisecond) // TODO: make this configurable
+				}
+			} else {
+				metrics, bytes, err := w.sendBatch(conn, batch)
+				if err == nil {
+					conn.receiveBuffer -= int64(metrics)
+					err = w.readResponse(conn, "")
+				}
+				if err == nil {
+					return metrics, bytes
 				} else {
 					glog.Errorf("Failed sending %d metrics to the consumer: %s", num, err)
+					//TODO: split the batch if 0 < conn.receiveBuffer < len(batch)
 				}
 			}
 		}
+	}
+	return 0, 0
+}
+
+func (w *WebsocketPublisher) DoBatch() {
+	for {
+		metrics, bytes := w.getAndSendOneBatch()
+		glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
+		w.OutgoingDatapoints.Mark(int64(metrics))
+		w.OutgoingBytes.Mark(int64(bytes))
 	}
 }
