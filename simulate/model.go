@@ -6,7 +6,7 @@ type Control struct {
 }
 
 type Metric struct {
-	Timestamp float64                `json:"timestamp"`
+	Timestamp int                    `json:"timestamp"`
 	Metric    string                 `json:"metric"`
 	Value     float64                `json:"value"`
 	Tags      map[string]interface{} `json:"tags"`

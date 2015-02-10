@@ -22,6 +22,11 @@ _testmain.go
 *.exe
 *.test
 
+metricshipper
+*.tgz
+*.rpm
+*.deb
 output
+simulate/simulate
 metricd/metricd
 coverage.out

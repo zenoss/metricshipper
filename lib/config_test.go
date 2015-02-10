@@ -2,7 +2,9 @@ package metricshipper
 
 import (
 	"fmt"
-	yaml "launchpad.net/goyaml"
+	"github.com/go-yaml/yaml"
+	"github.com/imdario/mergo"
+	flags "github.com/zenoss/go-flags"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,5 +72,72 @@ func TestNoValue(t *testing.T) {
 	}
 	if shipperConfig.BatchTimeout != 0 {
 		t.Error("Batch Timeout isn't empty")
+	}
+}
+
+func TestMergeOverrideNone(t *testing.T) {
+	type MergeConfig struct {
+		StringValue string  `long:"str" short:"s" description:"some string" default:"foo"`
+		IntValue    int     `long:"int" short:"i" description:"some int" default:"2"`
+		FloatValue  float64 `long:"float" short:"f" description:"some float" default:"1.1"`
+	}
+
+	defaultopts := &MergeConfig{}
+	actualopts := &MergeConfig{StringValue: "bar", IntValue: 5, FloatValue: 6.0}
+	expectedopts := *actualopts
+	mergo.Merge(actualopts, *defaultopts)
+
+	if !reflect.DeepEqual(expectedopts, *actualopts) {
+		t.Errorf("default options should have been merged into empty destination\nexpected: %+v \n  actual: %+v", &expectedopts, actualopts)
+	}
+}
+
+func TestMergeOverrideAllToEmpty(t *testing.T) {
+	type MergeConfig struct {
+		StringValue string  `long:"str" short:"s" description:"some string" default:"foo"`
+		IntValue    int     `long:"int" short:"i" description:"some int" default:"2"`
+		FloatValue  float64 `long:"float" short:"f" description:"some float" default:"1.1"`
+	}
+
+	// Parse the options with no arguments to get defaults
+	defaultopts := &MergeConfig{}
+	flags.ParseArgs(defaultopts, make([]string, 0))
+	expectedopts := *defaultopts
+
+	expectedString := "&{StringValue:foo IntValue:2 FloatValue:1.1}"
+	if expectedString != fmt.Sprintf("%+v", defaultopts) {
+		t.Errorf("expected values did not match actual\nexpected: %+v \n  actual: %+v", expectedString, defaultopts)
+	}
+
+	actualopts := &MergeConfig{}
+	mergo.Merge(actualopts, *defaultopts)
+
+	if !reflect.DeepEqual(expectedopts, *actualopts) {
+		t.Errorf("all non-empty options should have been merged into empty destination\nexpected: %+v \n  actual: %+v", &expectedopts, actualopts)
+	}
+}
+
+func TestMergeOverrideAll(t *testing.T) {
+	type MergeConfig struct {
+		StringValue string  `long:"str" short:"s" description:"some string" default:"foo"`
+		IntValue    int     `long:"int" short:"i" description:"some int" default:"2"`
+		FloatValue  float64 `long:"float" short:"f" description:"some float" default:"1.1"`
+	}
+
+	// Parse the options with no arguments to get defaults
+	defaultopts := &MergeConfig{}
+	flags.ParseArgs(defaultopts, make([]string, 0))
+	expectedopts := *defaultopts
+
+	expectedString := "&{StringValue:foo IntValue:2 FloatValue:1.1}"
+	if expectedString != fmt.Sprintf("%+v", defaultopts) {
+		t.Errorf("expected values did not match actual\nexpected: %+v \n  actual: %+v", expectedString, defaultopts)
+	}
+
+	actualopts := &MergeConfig{StringValue: "bar", IntValue: 5, FloatValue: 6.0}
+	mergo.Merge(actualopts, *defaultopts)
+
+	if !reflect.DeepEqual(expectedopts, *actualopts) {
+		t.Errorf("all non-empty options should have been merged into empty destination\nexpected: %+v \n  actual: %+v", &expectedopts, actualopts)
 	}
 }

@@ -2,7 +2,6 @@ package metricshipper
 
 import (
 	"bytes"
-	"code.google.com/p/go.net/websocket"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/zenoss/websocket"
 )
 
 var serverAddr string
@@ -60,26 +61,46 @@ func startServer() {
 }
 
 func TestConnectFail(t *testing.T) {
-	pub, _ := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
-	if err := pub.Start(); err == nil {
-		t.Errorf("Unable to connect: %s", err)
+	connected := make(chan bool)
+	go func() {
+		_, err := NewWebsocketPublisher("ws://127.0.0.1:12345/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+		if err != nil {
+			t.Fatalf("Could not create websocket publisher: %s", err)
+		}
+		connected <- true
+	}()
+	select {
+	case <-time.After(1 * time.Second):
+	case <-connected:
+		t.Error("Publisher connected with an invalid address")
 	}
 }
 
 func TestConnect(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
-	if err := pub.Start(); err != nil {
-		t.Error("Unable to connect: %s", err)
+	connected := make(chan bool)
+	go func() {
+		_, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+		if err != nil {
+			t.Fatalf("Could not create websocket publisher: %s", err)
+		}
+		connected <- true
+	}()
+	select {
+	case <-connected:
+	case <-time.After(1 * time.Second):
+		t.Fatal("Was unable to connect to valid consumer service in 1 second")
 	}
 }
 
 func TestPublishOne(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 1, "admin", "zenoss")
-	go pub.Start()
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 1, 1, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	if err != nil {
+		t.Fatalf("Could not create websocket publisher: %s", err)
+	}
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(1, "Didn't receive single metric", t)
@@ -88,8 +109,10 @@ func TestPublishOne(t *testing.T) {
 func TestHitBatchSize(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, "admin", "zenoss")
-	go pub.Start()
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	if err != nil {
+		t.Fatalf("Could not create websocket publisher: %s", err)
+	}
 	stageMetrics(2, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(0, "Sent batch early", t)
@@ -101,8 +124,10 @@ func TestHitBatchSize(t *testing.T) {
 func TestHitBatchTimeout(t *testing.T) {
 	once.Do(startServer)
 	defer clearBuffer()
-	pub, _ := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 1, "admin", "zenoss")
-	go pub.Start()
+	pub, err := NewWebsocketPublisher("ws://"+serverAddr+"/metrics", 1, 6, 3, 1, 1, 999, "admin", "zenoss", "json", 1, 1, 1)
+	if err != nil {
+		t.Fatalf("Could not create websocket publisher: %s", err)
+	}
 	stageMetrics(1, pub)
 	time.Sleep(5 * time.Millisecond)
 	assertBufferSize(0, "Sent batch early", t)

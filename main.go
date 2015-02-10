@@ -29,6 +29,7 @@ func main() {
 	// Get us some configuration
 	config, err := metricshipper.ParseShipperConfig()
 	if err != nil {
+		glog.Errorf("Unable to parse config: %s", err)
 		os.Exit(1)
 	}
 
@@ -43,16 +44,11 @@ func main() {
 		naive_pluralize(config.Writers, "connection"))
 	w, err := metricshipper.NewWebsocketPublisher(config.ConsumerUrl,
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
-		config.BatchTimeout, config.RetryConnection, time.Duration(config.RetryConnectionTimeout),
-		config.Username, config.Password)
+		config.BatchTimeout, time.Duration(config.RetryConnectionTimeout)*time.Second,
+		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding,
+		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
-		return
-	}
-	// Websocket forwarder manages its own goroutines
-	err = w.Start()
-	if err != nil {
-		glog.Error("Unable to start WebSocket forwarder")
 		return
 	}
 
@@ -73,6 +69,18 @@ func main() {
 		Outgoing: &w.Outgoing,
 	}
 	go p.Start()
+
+	// Create a stats reporter and start it
+	glog.Info("Warming up the stats reporter")
+	s := &metricshipper.MetricStats{
+		MetricsChannel:       &r.Incoming,
+		IncomingMeter:        &r.IncomingMeter,
+		OutgoingMeter:        &w.OutgoingDatapoints,
+		OutgoingBytes:        &w.OutgoingBytes,
+		StatsInterval:        config.StatsInterval,
+		ControlPlaneStatsURL: os.Getenv("CONTROLPLANE_CONSUMER_URL"),
+	}
+	go s.Start()
 
 	// Finally, open the Redis floodgates (also manages own goroutines)
 	glog.Info("Subscribing to metrics queue")

@@ -2,13 +2,15 @@ package metricshipper
 
 import (
 	"fmt"
-	"github.com/garyburd/redigo/redis"
-	"github.com/zenoss/glog"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	metrics "github.com/rcrowley/go-metrics"
+	"github.com/zenoss/glog"
 )
 
 type RedisConnectionConfig struct {
@@ -67,15 +69,22 @@ func DialFunc(config *RedisConnectionConfig) func() (redis.Conn, error) {
 
 // Reads metrics from redis
 type RedisReader struct {
-	Incoming    chan Metric
-	pool        *redis.Pool
-	concurrency int
-	batch_size  int
-	queue_name  string
+	Incoming      chan Metric
+	pool          *redis.Pool
+	concurrency   int
+	batch_size    int
+	queue_name    string
+	IncomingMeter metrics.Meter // no need to lock since metrics.Meter already does that
 }
 
 // Read a batch of metrics
-func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
+func (r *RedisReader) ReadBatch(conn *redis.Conn) (int, error) {
+
+	// ensure that at the end of this function the connection return to a normal state
+	defer func() {
+		(*conn).Do("DISCARD")
+	}()
+
 	var rangeresult []string
 	glog.V(2).Infof("enter RedisReader.ReadBatch( conn=%v)", &(*conn))
 
@@ -84,17 +93,19 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	var send_err error
 	if send_err = (*conn).Send("MULTI"); send_err != nil {
 		glog.Errorf("Error sending command, multi: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
-	if send_err = (*conn).Send("LRANGE", r.queue_name, 0, r.batch_size-1); send_err != nil {
+	//read from end of list (oldest values)
+	if send_err = (*conn).Send("LRANGE", r.queue_name, -r.batch_size, -1); send_err != nil {
 		glog.Errorf("Error sending command, lrange: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
-	if send_err = (*conn).Send("LTRIM", r.queue_name, r.batch_size, -1); send_err != nil {
+	//trim keeps newest values (values not yet read)
+	if send_err = (*conn).Send("LTRIM", r.queue_name, 0, -r.batch_size-1); send_err != nil {
 		glog.Errorf("Error sending command, ltrim: %s", send_err)
-		return -1
+		return 0, send_err
 	}
 
 	//read redis values
@@ -102,29 +113,35 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) int {
 	values, err := redis.Values((*conn).Do("EXEC"))
 	if err != nil {
 		glog.Errorf("Error retrieving metric values: %s", err)
-		return -1
+		return 0, err
 	}
 
 	//scan redis values
 	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Scanning Values")
 	if _, err := redis.Scan(values, &rangeresult); err != nil {
 		glog.Errorf("Error scanning metric values: %s", err)
-		return -1
+		return 0, err
 	}
 
+	var validmetric_count int64
 	// Else, deserialize each metric and shove it down the channel
 	glog.V(2).Infof("RedisReader.ReadBatch( ) -- Parsing Values")
 	for _, m := range rangeresult {
 		met, err := MetricFromJSON([]byte(m))
 		if err != nil {
-			glog.Errorf("Invalid metric json: %s", err)
+			glog.Errorf("Invalid metric json: %+v %s", m, err)
 		} else {
 			r.Incoming <- *met
+			validmetric_count++
+			glog.V(3).Infof("METRIC INC %+v", *met)
 		}
 	}
 
+	// update meter with number of metrics read
+	r.IncomingMeter.Mark(validmetric_count)
+
 	glog.V(2).Infof("exit RedisReader.ReadBatch( conn=%v) count=%d", &(*conn), len(rangeresult))
-	return len(rangeresult)
+	return len(rangeresult), nil
 }
 
 // Drain the redis queue into the out channel until there's nothing left.
@@ -139,15 +156,14 @@ func (r *RedisReader) Drain() {
 			conn := r.pool.Get()
 			defer conn.Close()
 			for {
-				count := r.ReadBatch(&conn)
+				count, err := r.ReadBatch(&conn)
+				// there was an error pulling data, create a new connection
+				if err != nil {
+					break
+				}
 				// If no metrics were returned, this goroutine's job is done
 				if count == 0 {
 					done = true
-					break
-				}
-
-				// there was an error pulling data, create a new connection
-				if count < 0 {
 					break
 				}
 			}
@@ -166,6 +182,10 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 	if err != nil {
 		return nil, err
 	}
+
+	incomingMeter := metrics.NewMeter()
+	metrics.Register("incomingMeter", incomingMeter)
+
 	glog.Infoln("Connecting to redis server", config.Server())
 	glog.Infoln("Metrics database:", config.Database)
 	glog.Infoln("Metrics queue name:", config.Channel)
@@ -177,25 +197,17 @@ func NewRedisReader(uri string, batch_size int, buffer_size int,
 			IdleTimeout: 240 * time.Second, // TODO: Configurable?
 			Dial:        DialFunc(config),
 		},
-		concurrency: concurrency,
-		batch_size:  batch_size,
-		queue_name:  config.Channel,
+		concurrency:   concurrency,
+		batch_size:    batch_size,
+		queue_name:    config.Channel,
+		IncomingMeter: incomingMeter,
 	}
 	return reader, nil
 }
 
-// terminate subscription
-var terminate int = 0
-
-// retry polling
-var retry int = 1
-
-// data's available, start draining
-var drain int = 2
-
 // Start listening for metrics by polling the metric queue
-func (r *RedisReader) Subscribe() (err error) {
-	//spawn go routines and wait for them to stop
+func (r *RedisReader) Subscribe() {
+	// spawn go routines and wait for them to stop
 	var complete sync.WaitGroup
 	for i := 0; i < r.concurrency; i += 1 {
 		complete.Add(1)
@@ -203,37 +215,10 @@ func (r *RedisReader) Subscribe() (err error) {
 			defer complete.Done()
 			//poll for data, then drain
 			for {
-				status, _err := r.poll()
-				if status == terminate {
-					err = _err
-					break
-				} else if status == drain {
-					r.Drain()
-				}
+				r.Drain()
+				time.Sleep(1 * time.Second)
 			}
 		}()
 	}
 	complete.Wait()
-	return nil
-}
-
-// poll the metrics list
-func (r *RedisReader) poll() (status int, err error) {
-	conn := r.pool.Get()
-	defer conn.Close()
-
-	// loop until data exists
-	for {
-		length, err := redis.Int(conn.Do("LLEN", r.queue_name))
-		if err != nil {
-			//TODO terminate logic
-			glog.Errorf("Error \"LLEN {}\": {}", r.queue_name, err)
-			return retry, err
-		}
-		if length > 0 {
-			return drain, nil
-		}
-
-		time.Sleep(1 * time.Second)
-	}
 }
