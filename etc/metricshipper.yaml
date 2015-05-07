@@ -71,3 +71,7 @@
 # Timeout between connection retry attempts in seconds
 #
 #retryconnectiontimeout: 1
+
+# Set the glog logging verbosity
+# 
+#verbosity: 0
