@@ -97,6 +97,12 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (me
 	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", w.pool.config.Location, len(batch.Metrics))
 	defer glog.V(3).Infof("exit sendBatch(), num=%d", num)
 
+	if glog.V(5) {
+		for _, m := range batch.Metrics {
+			glog.V(5).Infof("publishing: %+v", m)
+		}
+	}
+
 	switch strings.ToLower(w.encoding) {
 	case "json":
 		bytes, err = websocket.JSON.Send(conn.conn, batch)
