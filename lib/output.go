@@ -87,7 +87,7 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch, *MetricBatch) {
 		case <-timer:
 			i = remaining // Break out of the loop
 		case m := <-w.Outgoing:
-			if m.Status == 0 {
+			if m.Error {
 				errorBuffer = append(errorBuffer, m)
 			} else {
 				buf = append(buf, m)

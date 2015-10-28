@@ -15,9 +15,9 @@ func (m *MetricProcessor) Start() {
 		processed, err := m.Process(&metric)
 		if err != nil {
 			glog.V(3).Infof("There was an error processing a metric")
-			processed.Status = 0
+			processed.Error = true
 		} else {
-			processed.Status = 1
+			processed.Error = false
 		}
 
 		*m.Outgoing <- *processed
