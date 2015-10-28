@@ -78,7 +78,7 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch, *MetricBatch) {
 	errorBatch := &MetricBatch{
 		Metrics: errorBuffer,
 	}
-	defer glog.V(3).Infof("exit getBatch(), len(buf)=%d", len(buf))
+	defer glog.V(3).Infof("exit getBatch(), len(buf)=%d, len(errorBuffer)=%d", len(buf), len(errorBuffer))
 
 	remaining := w.batch_size - len(buf)
 	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
