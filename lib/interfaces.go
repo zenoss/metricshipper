@@ -22,6 +22,7 @@ type Metric struct {
 	Metric    string                 `json:"metric"`
 	Value     float64                `json:"value"`
 	Tags      map[string]interface{} `json:"tags"`
+	Status	  int					 `json:"status`  //0 is error, 1 is correctly processed
 }
 
 //UnmarshalJSON supports string and non-string encoded Metric Values

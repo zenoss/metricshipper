@@ -78,6 +78,7 @@ func main() {
 		OutgoingMeter:        &w.OutgoingDatapoints,
 		OutgoingBytes:        &w.OutgoingBytes,
 		StatsInterval:        config.StatsInterval,
+		ErrorsMeter:		  &w.ErrorDatapoints,
 		ControlPlaneStatsURL: os.Getenv("CONTROLPLANE_CONSUMER_URL"),
 	}
 	go s.Start()
