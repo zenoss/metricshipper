@@ -1,4 +1,7 @@
 package metricshipper
+import (
+	"github.com/zenoss/glog"
+)
 
 type MetricProcessor struct {
 	Incoming *chan Metric
@@ -11,9 +14,13 @@ func (m *MetricProcessor) Start() {
 
 		processed, err := m.Process(&metric)
 		if err != nil {
-			// Log
+			glog.V(3).Infof("There was an error processing a metric")
+			processed.Error = true
 			continue
+		} else {
+			processed.Error = false
 		}
+
 		*m.Outgoing <- *processed
 	}
 }
