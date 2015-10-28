@@ -55,7 +55,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:           make(chan Metric, buffer_size),
 		OutgoingDatapoints: outgoingDatapoints,
 		OutgoingBytes:      outgoingBytes,
-		ErrorDatapoints:	errorDataPoints,
+		ErrorDatapoints:    errorDataPoints,
 	}
 
 	// Block until at least one connection has been established
