@@ -122,7 +122,11 @@ rpm: stage_pkg
 	cp -p /tmp/*.rpm .
 
 clean:
-	go clean
+	if [[ `which go` ]]; then
+		go clean
+	else
+		rm -f metricshipper metricshipper.exe metricshipper.test metricshipper.test.exe main main.exe main_test main_test.exe
+	fi
 	rm -f *.deb
 	rm -f *.rpm
 	rm -f *.tgz
