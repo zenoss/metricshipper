@@ -122,7 +122,8 @@ rpm: stage_pkg
 	cp -p /tmp/*.rpm .
 
 clean:
-	go clean
+	# go clean
+	rm -f metricshipper metricshipper.exe metricshipper.test metricshipper.test.exe main main.exe main_test main_test.exe
 	rm -f *.deb
 	rm -f *.rpm
 	rm -f *.tgz
