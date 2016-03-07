@@ -159,6 +159,8 @@ func (r *RedisReader) Drain() {
 				count, err := r.ReadBatch(&conn)
 				// there was an error pulling data, create a new connection
 				if err != nil {
+					glog.Errorf("Error pulling data: %v. Creating a new connection.", err)
+					done = true
 					break
 				}
 				// If no metrics were returned, this goroutine's job is done
