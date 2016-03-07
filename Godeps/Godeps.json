@@ -6,9 +6,10 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "code.google.com/p/snappy-go/snappy",
+			"ImportPath": "github.com/syndtr/gosnappy/snappy",
 			"Comment": "null-15",
-			"Rev": "12e4b4183793ac4b061921e7980845e750679fd0"
+			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
+
 		},
 		{
 			"ImportPath": "github.com/garyburd/redigo/redis",

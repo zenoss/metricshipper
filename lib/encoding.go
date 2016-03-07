@@ -2,7 +2,7 @@ package metricshipper
 
 import (
 	"bytes"
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/syndtr/gosnappy/snappy"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
