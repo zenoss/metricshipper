@@ -24,6 +24,7 @@ type WebsocketPublisher struct {
 	Outgoing           chan Metric
 	OutgoingDatapoints metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes      metrics.Meter // number of bytes written to websocket endpoint
+	ErrorDatapoints    metrics.Meter // number of datapoints with errors.
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
@@ -44,6 +45,8 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	metrics.Register("outgoingDatapoints", outgoingDatapoints)
 	outgoingBytes := metrics.NewMeter()
 	metrics.Register("outgoingBytes", outgoingBytes)
+	errorDataPoints := metrics.NewMeter()
+	metrics.Register("errorDatapoints", errorDataPoints)
 
 	pool := NewWebSocketConnPool(concurrency, retry_connection_timeout, max_connection_age, config)
 	publisher = &WebsocketPublisher{
@@ -54,6 +57,7 @@ func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 		Outgoing:           make(chan Metric, buffer_size),
 		OutgoingDatapoints: outgoingDatapoints,
 		OutgoingBytes:      outgoingBytes,
+		ErrorDatapoints:    errorDataPoints,
 	}
 
 	// Block until at least one connection has been established
@@ -76,11 +80,16 @@ var batchLimit = func(w *WebsocketPublisher, conn *WebSocketConn) int {
 	return int(conn.receiveBuffer)
 }
 
-func (w *WebsocketPublisher) getBatch(conn *WebSocketConn) *MetricBatch {
+func (w *WebsocketPublisher) getBatch(conn *WebSocketConn) (*MetricBatch, *MetricBatch) {
 	buf := make([]Metric, 0)
+	errorBuf := make([]Metric, 0)
 	batch := &MetricBatch{
 		Metrics: buf,
 	}
+	errorBatch := &MetricBatch{
+		Metrics: errorBuf,
+	}
+	defer glog.V(3).Infof("exit getBatch(), len(buf)=%d, len(errorBuffer)=%d", len(buf), len(errorBuf))
 	limit := batchLimit(w, conn)
 	timer := time.After(time.Duration(w.batch_timeout) * time.Second)
 	for i := 0; i < limit; i++ {
@@ -89,16 +98,21 @@ func (w *WebsocketPublisher) getBatch(conn *WebSocketConn) *MetricBatch {
 			i = limit // Break out of the loop
 		case m := <-w.Outgoing:
 			buf = append(buf, m)
+			if m.Error {
+				errorBuf = append(errorBuf, m)
+			} else {
+				buf = append(buf, m)
+			}
 		}
 	}
 	batch.Metrics = buf
-	return batch
+	return batch, errorBatch
 }
 
 func (w *WebsocketPublisher) sendBatch(conn *WebSocketConn, batch *MetricBatch) (metricCount, bytes int, err error) {
-	num := len(batch.Metrics)
-	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", w.pool.config.Location, num)
-	defer glog.V(3).Infof("exit sendBatch(), len(batch)=%d", num)
+	bl := len(batch.Metrics)
+	glog.V(3).Infof("enter sendBatch(), conn=%s, len(batch)=%d", w.pool.config.Location, bl)
+	defer glog.V(3).Infof("exit sendBatch(), len(batch)=%d", bl)
 
 	if glog.V(5) {
 		for _, m := range batch.Metrics {
@@ -118,9 +132,9 @@ func (w *WebsocketPublisher) sendBatch(conn *WebSocketConn, batch *MetricBatch) 
 	}
 	if err != nil {
 		conn.Close()
-		return num, bytes, err
+		return bl, bytes, err
 	}
-	return num, bytes, nil
+	return bl, bytes, nil
 }
 
 var bufferPool = &sync.Pool{
@@ -204,15 +218,16 @@ var pollForFreeBuffer = func(conn *WebSocketConn) bool {
 	return conn.receiveBuffer <= 0
 }
 
-func (w *WebsocketPublisher) getAndSendOneBatch() (metricCount, byteCount int) {
+func (w *WebsocketPublisher) getAndSendOneBatch() (metricCount, errorCount, byteCount int) {
 	glog.V(3).Infof("enter getAndSendOneBatch()")
 	defer glog.V(3).Infof("exit getAndSendOneBatch()")
 
 	conn := w.pool.Get()
 	defer w.pool.Put(conn)
 
-	batch := w.getBatch(conn)
+	batch, errBatch := w.getBatch(conn)
 	num := len(batch.Metrics)
+	errNum := len(errBatch.Metrics)
 
 	if pollForFreeBuffer(conn) || num > 0 {
 		// Retry loop...
@@ -237,7 +252,7 @@ func (w *WebsocketPublisher) getAndSendOneBatch() (metricCount, byteCount int) {
 					err = w.readResponse(conn, "")
 				}
 				if err == nil {
-					return metrics, bytes
+					return metrics, errNum, bytes
 				} else {
 					glog.Errorf("Failed sending %d metrics to the consumer: %s", num, err)
 					//TODO: split the batch if 0 < conn.receiveBuffer < len(batch)
@@ -245,14 +260,15 @@ func (w *WebsocketPublisher) getAndSendOneBatch() (metricCount, byteCount int) {
 			}
 		}
 	}
-	return 0, 0
+	return 0, errNum, 0
 }
 
 func (w *WebsocketPublisher) DoBatch() {
 	for {
-		metrics, bytes := w.getAndSendOneBatch()
+		metrics, errNum, bytes := w.getAndSendOneBatch()
 		glog.V(2).Infof("Sent %d metrics to the consumer.", metrics)
 		w.OutgoingDatapoints.Mark(int64(metrics))
 		w.OutgoingBytes.Mark(int64(bytes))
+		w.ErrorDatapoints.Mark(int64(errNum))
 	}
 }
