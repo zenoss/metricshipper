@@ -77,9 +77,9 @@ test: $(FULL_NAME)
 	godep go test -v ./...
 
 tgz: stage_pkg
-	tar cvfz /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz -C $(PKGROOT)/usr .
-	chown $(DUID):$(DGID) /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz
-	mv /tmp/$(FULL_NAME)-$(GIT_COMMIT).tgz .
+	tar cvfz /tmp/$(FULL_NAME)-$(VERSION).tgz -C $(PKGROOT)/usr .
+	chown $(DUID):$(DGID) /tmp/$(FULL_NAME)-$(VERSION).tgz
+	mv /tmp/$(FULL_NAME)-$(VERSION).tgz .
 
 deb: stage_pkg
 	fpm \
