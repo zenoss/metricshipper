@@ -18,3 +18,13 @@ requires a redis server running in the background.
 
 4. Execute - Producer
   ./simulate/simulate producer -t 512000 -b 128
+
+# Releasing
+
+Use git flow to release a version to the `master` branch.
+
+The image version number is defined in the [VERSION](./VERSION) file.
+
+For Zenoss employeers, the details on using git-flow to release a new version is documented on the Zenoss Engineering 
+web site [here](https://sites.google.com/a/zenoss.com/engineering/home/faq/developer-patterns/using-git-flow).
+After the git flow release process is complete, a jenkins job must be triggered manually to build and publish the images to docker hub. 
