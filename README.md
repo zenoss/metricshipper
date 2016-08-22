@@ -23,7 +23,7 @@ requires a redis server running in the background.
 
 Use git flow to release a version to the `master` branch.
 
-The image version number is defined in the [VERSION](./VERSION) file.
+The artifact version number is defined in the [VERSION](./VERSION) file.
 
 For Zenoss employeers, the details on using git-flow to release a new version is documented on the Zenoss Engineering 
 web site [here](https://sites.google.com/a/zenoss.com/engineering/home/faq/developer-patterns/using-git-flow).
