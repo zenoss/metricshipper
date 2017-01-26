@@ -1,11 +1,17 @@
 package metricshipper
 
 import (
-	"time"
+        "os"
+        "sync"
+        "time"
 
 	"github.com/zenoss/glog"
 	"github.com/zenoss/websocket"
 )
+
+const websocket_error = "/opt/zenoss/var/websocket_error"
+
+var mutex = &sync.Mutex{}
 
 type WebSocketConn struct {
 	conn       *websocket.Conn // The underlying connection
@@ -32,10 +38,27 @@ func (pool *WebSocketConnPool) newWebSocket() *WebSocketConn {
 	for {
 		if conn, err := websocket.DialConfig(pool.config); err != nil {
 			glog.Infof("Unable to connect to consumer %s", pool.config.Location)
+                       mutex.Lock()
+                       if _, err := os.Stat(websocket_error); os.IsNotExist(err) {
+                           f, err := os.Create(websocket_error)
+                           if err != nil {
+                               glog.Infof("%s", err)
+                           }
+                           f.Close()
+                       }
+                       mutex.Unlock()
 			time.Sleep(pool.delay)
 			continue
 		} else {
 			glog.Infof("Connected to consumer %s", pool.config.Location)
+                       mutex.Lock()
+                       if _, err := os.Stat(websocket_error); err == nil {
+                           err := os.Remove(websocket_error)
+                           if err != nil {
+                               glog.Infof("%s", err)
+                           }
+                       }
+                       mutex.Unlock()
 			var expires time.Time
 			// Don't expire connections if maxage is 0
 			if pool.maxage > 0 {
