@@ -30,3 +30,6 @@ output
 simulate/simulate
 metricd/metricd
 coverage.out
+
+# IntelliJ workspace files
+.idea
