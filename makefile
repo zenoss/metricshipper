@@ -14,15 +14,27 @@
 # along with Foobar. If not, see <http://www.gnu.org/licenses/>.
 
 ## setup all environment stuff
-URL           = https://github.com/zenoss/metricshipper
-FULL_NAME     = $(shell basename $(URL))
-VERSION      := $(shell cat ./VERSION)
-DATE         := $(shell date -u)
-GIT_COMMIT   ?= $(shell ./hack/gitstatus.sh)
-GIT_BRANCH   ?= $(shell git rev-parse --abbrev-ref HEAD)
+URL             = https://github.com/zenoss/metricshipper
+FULL_NAME       = $(shell basename $(URL))
+VERSION        := $(shell cat ./VERSION)
+DATE           := $(shell date -u '+%a_%b_%d_%H:%M:%S_%Z_%Y')
+GIT_COMMIT     ?= $(shell ./hack/gitstatus.sh)
+GIT_BRANCH     ?= $(shell git rev-parse --abbrev-ref HEAD)
 # jenkins default, jenkins-${JOB_NAME}-${BUILD_NUMBER}
-BUILD_TAG    ?= 0
-LDFLAGS       = -ldflags "-X main.Version $(VERSION) -X main.Gitcommit '$(GIT_COMMIT)' -X main.Gitbranch '$(GIT_BRANCH)' -X main.Date '$(DATE)' -X main.Buildtag '$(BUILD_TAG)'"
+BUILD_TAG      ?= 0
+
+GO_VERSION     := $(shell go version | awk '{print $$3}')
+GO              = $(shell which go)
+
+MIN_GO_VERSION ?= go1.7
+
+
+LDFLAGS = -ldflags "\
+	-X main.Version=$(VERSION) \
+	-X main.Gitcommit=$(GIT_COMMIT) \
+	-X main.Gitbranch=$(GIT_BRANCH) \
+	-X main.Date=$(DATE) \
+	-X main.Buildtag=$(BUILD_TAG)"
 
 MAINTAINER    = dev@zenoss.com
 # https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/#license-specification
@@ -34,14 +46,16 @@ PKGROOT       = /tmp/$(FULL_NAME)-pkgroot-$(GIT_COMMIT)
 DUID         ?= $(shell id -u)
 DGID         ?= $(shell id -g)
 DESCRIPTION  := A broker to ship performance data published to redis to the Zenoss datapoint consumer.
-GODEPS_FILES := $(shell find Godeps/)
+GOSOURCEFILES := $(shell find `go list -f '{{.Dir}}' ./... | grep -v /vendor/` -maxdepth 1 -name \*.go)
 FULL_PATH     = $(shell echo $(URL) | sed 's|https:/||')
 DOCKER_WDIR  := /go/src$(FULL_PATH)
 
+.PHONY: build
+build: goversion $(FULL_NAME)
 
 ## generic workhorse targets
-$(FULL_NAME): VERSION *.go hack/* makefile $(GODEPS_FILES)
-	godep go build ${LDFLAGS}
+$(FULL_NAME): VERSION *.go hack/* makefile $(GOSOURCEFILES)
+	$(GO) build ${LDFLAGS} -o $(FULL_NAME) .
 	chown $(DUID):$(DGID) $(FULL_NAME)
 
 docker-test: $(FULL_NAME)-build
@@ -59,6 +73,15 @@ docker-deb: $(FULL_NAME)-build
 docker-rpm: $(FULL_NAME)-build
 	docker run --rm -v `pwd`:$(DOCKER_WDIR) -w $(DOCKER_WDIR) -e DUID=$(DUID) -e DGID=$(DGID) zenoss/$(FULL_NAME)-build:$(VERSION) make rpm
 
+
+# Verify that we are running with the right go version
+.PHONY: goversion
+goversion:
+ifeq "$(shell go version | grep $(MIN_GO_VERSION))" ""
+        $(error "Build requires go version $(MIN_GO_VERSION)")
+endif
+
+
 # actual work
 .PHONY: $(FULL_NAME)-build
 $(FULL_NAME)-build:
@@ -74,7 +97,7 @@ stage_pkg: $(FULL_NAME)
 	ln -s ../metricshipper/metricshipper_supervisor.conf $(PKGROOT)/usr/etc/supervisor || echo "Supervisor config already exists"
 
 test: $(FULL_NAME)
-	godep go test -v ./...
+	go test -v $(go list ./... | grep -v /vendor/)
 
 tgz: stage_pkg
 	tar cvfz /tmp/$(FULL_NAME)-$(VERSION).tgz -C $(PKGROOT)/usr .
@@ -131,5 +154,5 @@ clean:
 	rm -f *.rpm
 	rm -f *.tgz
 	rm -fr /tmp/$(FULL_NAME)-pkgroot-*
-
+	rm -f $(FULL_NAME)
 
