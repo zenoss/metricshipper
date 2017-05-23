@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/control-center/serviced/logging"
+	"time"
 )
 
 var (
@@ -40,8 +41,17 @@ func (m *Metric) HasTracer() bool {
 }
 
 func (m *Metric) TracerMessage(msg string) {
+	elapsed := "bad_tracetime"
+	if ttime, ok := m.Tags["mtrace"].(string); ok {
+		traceTime, err := strconv.ParseInt(ttime, 10, 64)
+		if err == nil {
+			elapsed = strconv.FormatInt(time.Now().Unix() - traceTime, 10)
+		}
+	}
+
 	plog.WithFields(logrus.Fields{
 		"mtrace":   m.Tags["mtrace"],
+		"elapsed":  elapsed,
 		"metric":   m.Metric,
 		"timestamp": int64(m.Timestamp),
 		"value":    m.Value,
