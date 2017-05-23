@@ -43,7 +43,7 @@ func (m *Metric) TracerMessage(msg string) {
 	plog.WithFields(logrus.Fields{
 		"mtrace":   m.Tags["mtrace"],
 		"metric":   m.Metric,
-		"timetamp": m.Timestamp,
+		"timestamp": int64(m.Timestamp),
 		"value":    m.Value,
 		"tags":     m.Tags,
 	}).Info(msg)
