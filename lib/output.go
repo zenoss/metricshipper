@@ -22,7 +22,7 @@ type WebsocketPublisher struct {
 	Outgoing           chan Metric
 	OutgoingDatapoints metrics.Meter // number of datapoints written to websocket endpoint
 	OutgoingBytes      metrics.Meter // number of bytes written to websocket endpoint
-	ErrorDatapoints	   metrics.Meter
+	ErrorDatapoints    metrics.Meter
 }
 
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
@@ -115,6 +115,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (me
 			glog.V(5).Infof("publishing: %+v", m)
 		}
 	}
+	batch.Tracer("publishing")
 
 	switch strings.ToLower(w.encoding) {
 	case "json":
@@ -130,6 +131,7 @@ func (w *WebsocketPublisher) sendBatch(batch *MetricBatch, backoff *Backoff) (me
 		conn.Close()
 		return num, bytes, err
 	}
+	batch.Tracer("sent")
 	return num, bytes, w.readResponse(conn, backoff)
 }
 

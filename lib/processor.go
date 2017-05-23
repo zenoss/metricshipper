@@ -1,4 +1,5 @@
 package metricshipper
+
 import (
 	"github.com/zenoss/glog"
 )
@@ -27,5 +28,8 @@ func (m *MetricProcessor) Start() {
 
 func (m *MetricProcessor) Process(metric *Metric) (met *Metric, err error) {
 	// POLICY GOES HERE
+	if met != nil && met.HasTracer() {
+		met.TracerMessage("Process()")
+	}
 	return metric, nil
 }

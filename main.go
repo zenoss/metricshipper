@@ -7,6 +7,12 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/control-center/serviced/logging"
+)
+
+var (
+	plog = logging.PackageLogger()
 )
 
 func naive_pluralize(i int, word string) string {
@@ -26,6 +32,7 @@ func numProcs(c *metricshipper.ShipperConfig) int {
 }
 
 func main() {
+	plog.Info("begin main()")
 	// Get us some configuration
 	config, err := metricshipper.ParseShipperConfig()
 	if err != nil {
@@ -37,6 +44,7 @@ func main() {
 	// available logical CPUs
 	num := numProcs(config)
 	glog.Infof("Using %d %s", num, naive_pluralize(num, "processor"))
+	plog.WithField("numprocs", num).Info("starting")
 	runtime.GOMAXPROCS(num)
 
 	// First, connect to the websocket
@@ -55,6 +63,8 @@ func main() {
 	// Next, try to connect to Redis
 	glog.Infof("Initiating %d %s to redis", config.Readers,
 		naive_pluralize(config.Readers, "connection"))
+	plog.WithField("numreaders", config.Readers).
+		Info("Initiating connection(s) to redis")
 	r, err := metricshipper.NewRedisReader(config.RedisUrl, config.MaxBatchSize,
 		config.MaxBufferSize, config.Readers)
 	if err != nil {

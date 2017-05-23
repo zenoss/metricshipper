@@ -6,6 +6,13 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/control-center/serviced/logging"
+)
+
+var (
+	plog = logging.PackageLogger()
 )
 
 type PublisherError struct {
@@ -23,6 +30,23 @@ type Metric struct {
 	Value     float64                `json:"value"`
 	Tags      map[string]interface{} `json:"tags"`
 	Error     bool                   `json:"error"`
+}
+
+func (m *Metric) HasTracer() bool {
+	if _, ok := m.Tags["mtrace"]; ok {
+		return true
+	}
+	return false
+}
+
+func (m *Metric) TracerMessage(msg string) {
+	plog.WithFields(logrus.Fields{
+		"mtrace":   m.Tags["mtrace"],
+		"metric":   m.Metric,
+		"timetamp": m.Timestamp,
+		"value":    m.Value,
+		"tags":     m.Tags,
+	}).Info(msg)
 }
 
 //UnmarshalJSON supports string and non-string encoded Metric Values
@@ -99,6 +123,14 @@ func (m Metric) Equal(that Metric) bool {
 type MetricBatch struct {
 	Control interface{} `json:"control"` // Should be nil
 	Metrics []Metric    `json:"metrics"`
+}
+
+func (b MetricBatch) Tracer(msg string) {
+	for _, m := range b.Metrics {
+		if m.HasTracer() {
+			m.TracerMessage(msg)
+		}
+	}
 }
 
 // Convert a JSON-serialized metric into an instance
