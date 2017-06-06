@@ -40,6 +40,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	glog.V(1).Infof("mtrace flag: metricshipper.MtraceEnabled = %t", config.MtraceEnabled)
+
 	// Adjust parallelism to specified values or default to number of
 	// available logical CPUs
 	num := numProcs(config)
@@ -54,7 +56,7 @@ func main() {
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, time.Duration(config.RetryConnectionTimeout)*time.Second,
 		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding,
-		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay)
+		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay, config.MtraceEnabled)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return

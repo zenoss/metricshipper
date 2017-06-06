@@ -28,7 +28,9 @@ type WebsocketPublisher struct {
 func NewWebsocketPublisher(uri string, concurrency int, buffer_size int,
 	batch_size int, batch_timeout float64, retry_connection_timeout time.Duration,
 	max_connection_age time.Duration, username string, password string,
-	encoding string, window, maxcollisions, maxdelay int) (publisher *WebsocketPublisher, err error) {
+	encoding string, window, maxcollisions, maxdelay int, mte bool) (publisher *WebsocketPublisher, err error) {
+
+	mtraceEnabled = mte
 
 	config, err := websocket.NewConfig(uri, origin)
 	if err != nil {
@@ -74,6 +76,7 @@ func (w *WebsocketPublisher) getBatch() (int, *MetricBatch, *MetricBatch) {
 	errorBuffer := make([]Metric, 0)
 	batch := &MetricBatch{
 		Metrics: buf,
+		MTraceEnabled: mtraceEnabled,
 	}
 	errorBatch := &MetricBatch{
 		Metrics: errorBuffer,

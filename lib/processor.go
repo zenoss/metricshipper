@@ -27,8 +27,11 @@ func (m *MetricProcessor) Start() {
 }
 
 func (m *MetricProcessor) Process(metric *Metric) (met *Metric, err error) {
+	glog.V(1).Infof("MetricProcessor.Process() mtrace flag mtraceEnabled = %t", mtraceEnabled)
 	// POLICY GOES HERE
-	if met != nil && met.HasTracer() {
+	if met == nil {
+		glog.V(2).Infof("MetricProcessor.Process(): nil metric passed in")
+	} else if mtraceEnabled && met.HasTracer() {
 		met.TracerMessage("Process()")
 	}
 	return metric, nil

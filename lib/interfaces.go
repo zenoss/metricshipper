@@ -14,7 +14,12 @@ import (
 
 var (
 	plog = logging.PackageLogger()
+	mtraceEnabled = false
 )
+
+func init() {
+	// set traceEnabled here
+}
 
 type PublisherError struct {
 	Msg string
@@ -114,11 +119,11 @@ func (m *Metric) UnmarshalJSON(data []byte) (err error) {
 }
 
 func (m Metric) Equal(that Metric) bool {
-	if math.Abs(m.Timestamp-that.Timestamp) > 0.000000001 {
+	if math.Abs(m.Timestamp - that.Timestamp) > 0.000000001 {
 		return false
 	}
 
-	if math.Abs(m.Value-that.Value) > 0.000000001 {
+	if math.Abs(m.Value - that.Value) > 0.000000001 {
 		return false
 	}
 
@@ -131,11 +136,15 @@ func (m Metric) Equal(that Metric) bool {
 
 // Structure of message forwarded via websocket
 type MetricBatch struct {
-	Control interface{} `json:"control"` // Should be nil
-	Metrics []Metric    `json:"metrics"`
+	Control       interface{} `json:"control"` // Should be nil
+	Metrics       []Metric    `json:"metrics"`
+	MTraceEnabled bool
 }
 
 func (b MetricBatch) Tracer(msg string) {
+	if !mtraceEnabled {
+		return
+	}
 	for _, m := range b.Metrics {
 		if m.HasTracer() {
 			m.TracerMessage(msg)

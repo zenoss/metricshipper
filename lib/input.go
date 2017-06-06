@@ -131,7 +131,7 @@ func (r *RedisReader) ReadBatch(conn *redis.Conn) (int, error) {
 		if err != nil {
 			glog.Errorf("Invalid metric json: %+v %s", m, err)
 		} else {
-			if met.HasTracer() {
+			if mtraceEnabled && met.HasTracer() {
 				met.TracerMessage("metric read from redis")
 			}
 			r.Incoming <- *met
