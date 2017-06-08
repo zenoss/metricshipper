@@ -6,7 +6,20 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/control-center/serviced/logging"
+	"time"
 )
+
+var (
+	plog = logging.PackageLogger()
+	mtraceEnabled = false
+)
+
+func init() {
+	// set traceEnabled here
+}
 
 type PublisherError struct {
 	Msg string
@@ -23,6 +36,32 @@ type Metric struct {
 	Value     float64                `json:"value"`
 	Tags      map[string]interface{} `json:"tags"`
 	Error     bool                   `json:"error"`
+}
+
+func (m *Metric) HasTracer() bool {
+	if _, ok := m.Tags["mtrace"]; ok {
+		return true
+	}
+	return false
+}
+
+func (m *Metric) TracerMessage(msg string) {
+	elapsed := "bad_tracetime"
+	if ttime, ok := m.Tags["mtrace"].(string); ok {
+		traceTime, err := strconv.ParseInt(ttime, 10, 64)
+		if err == nil {
+			elapsed = strconv.FormatInt(time.Now().Unix() - traceTime, 10)
+		}
+	}
+
+	plog.WithFields(logrus.Fields{
+		"mtrace":   m.Tags["mtrace"],
+		"elapsed":  elapsed,
+		"metric":   m.Metric,
+		"timestamp": int64(m.Timestamp),
+		"value":    m.Value,
+		"tags":     m.Tags,
+	}).Info(msg)
 }
 
 //UnmarshalJSON supports string and non-string encoded Metric Values
@@ -80,11 +119,11 @@ func (m *Metric) UnmarshalJSON(data []byte) (err error) {
 }
 
 func (m Metric) Equal(that Metric) bool {
-	if math.Abs(m.Timestamp-that.Timestamp) > 0.000000001 {
+	if math.Abs(m.Timestamp - that.Timestamp) > 0.000000001 {
 		return false
 	}
 
-	if math.Abs(m.Value-that.Value) > 0.000000001 {
+	if math.Abs(m.Value - that.Value) > 0.000000001 {
 		return false
 	}
 
@@ -97,8 +136,20 @@ func (m Metric) Equal(that Metric) bool {
 
 // Structure of message forwarded via websocket
 type MetricBatch struct {
-	Control interface{} `json:"control"` // Should be nil
-	Metrics []Metric    `json:"metrics"`
+	Control       interface{} `json:"control"` // Should be nil
+	Metrics       []Metric    `json:"metrics"`
+	MTraceEnabled bool
+}
+
+func (b MetricBatch) Tracer(msg string) {
+	if !mtraceEnabled {
+		return
+	}
+	for _, m := range b.Metrics {
+		if m.HasTracer() {
+			m.TracerMessage(msg)
+		}
+	}
 }
 
 // Convert a JSON-serialized metric into an instance

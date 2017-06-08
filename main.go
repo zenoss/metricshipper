@@ -7,6 +7,12 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"github.com/control-center/serviced/logging"
+)
+
+var (
+	plog = logging.PackageLogger()
 )
 
 func naive_pluralize(i int, word string) string {
@@ -26,6 +32,7 @@ func numProcs(c *metricshipper.ShipperConfig) int {
 }
 
 func main() {
+	plog.Info("begin main()")
 	// Get us some configuration
 	config, err := metricshipper.ParseShipperConfig()
 	if err != nil {
@@ -33,10 +40,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	glog.V(1).Infof("mtrace flag: metricshipper.MtraceEnabled = %t", config.MtraceEnabled)
+
 	// Adjust parallelism to specified values or default to number of
 	// available logical CPUs
 	num := numProcs(config)
 	glog.Infof("Using %d %s", num, naive_pluralize(num, "processor"))
+	plog.WithField("numprocs", num).Info("starting")
 	runtime.GOMAXPROCS(num)
 
 	// First, connect to the websocket
@@ -46,7 +56,7 @@ func main() {
 		config.Readers, config.MaxBufferSize, config.MaxBatchSize,
 		config.BatchTimeout, time.Duration(config.RetryConnectionTimeout)*time.Second,
 		time.Duration(config.MaxConnectionAge)*time.Second, config.Username, config.Password, config.Encoding,
-		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay)
+		config.BackoffWindow, config.MaxBackoffSteps, config.MaxBackoffDelay, config.MtraceEnabled)
 	if err != nil {
 		glog.Error("Unable to create WebSocket forwarder")
 		return
@@ -55,6 +65,8 @@ func main() {
 	// Next, try to connect to Redis
 	glog.Infof("Initiating %d %s to redis", config.Readers,
 		naive_pluralize(config.Readers, "connection"))
+	plog.WithField("numreaders", config.Readers).
+		Info("Initiating connection(s) to redis")
 	r, err := metricshipper.NewRedisReader(config.RedisUrl, config.MaxBatchSize,
 		config.MaxBufferSize, config.Readers)
 	if err != nil {

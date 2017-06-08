@@ -75,3 +75,7 @@
 # Set the glog logging verbosity
 # 
 #verbosity: 0
+
+# Enable or disable mtrace
+#
+#mtraceenabled: false
