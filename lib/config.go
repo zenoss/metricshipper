@@ -33,6 +33,7 @@ type ShipperConfig struct {
 	Password               string  `long:"password" description:"Password to use when connecting to the consumer"`
 	CPUs                   int     `long:"num-cpus" description:"Number of CPUs to use." default:"4"`
 	StatsInterval          int     `long:"stats-interval" description:"Number of seconds between publishing stats" default:"30"`
+	MtraceEnabled          bool    `long:"mtrace-enabled" description:"Enables metric traces in conjunction with traceMetricName traceMetricKey settings on collector" default:"false"`
 }
 
 func LoadYAMLConfig(reader io.Reader, cfg *ShipperConfig) error {
@@ -63,6 +64,7 @@ func ParseShipperConfig() (*ShipperConfig, error) {
 	// Now that we have the config file (if passed in), parse that
 	if file, err := os.Open(commandlineopts.ConfigFilePath); err == nil {
 		LoadYAMLConfig(file, cfgfileopts)
+		glog.V(1).Infof("Loaded YAML config. mtrace cfgfileopts = %v", cfgfileopts)
 	}
 
 	// Parse the options with no arguments to get defaults
