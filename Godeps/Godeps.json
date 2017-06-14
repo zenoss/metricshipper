@@ -1,6 +1,7 @@
 {
 	"ImportPath": "github.com/zenoss/metricshipper",
-	"GoVersion": "go1.3.3",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
 	],
@@ -43,6 +44,10 @@
 		{
 			"ImportPath": "github.com/zenoss/websocket",
 			"Rev": "1ddd7b38355cfd186f91ada432ef5147fb104a18"
+		},
+		{
+			"ImportPath": "github.com/alicebob/miniredis",
+			"Rev": "995ba133bd8fe5dae5a34732bd99f558b0b60e1a"
 		}
 	]
 }
