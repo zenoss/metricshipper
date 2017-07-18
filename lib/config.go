@@ -15,7 +15,7 @@ import (
 
 type ShipperConfig struct {
 	ConfigFilePath         string  `long:"config" short:"c" description:"Path to configuration file"`
-	RedisUrl               string  `long:"redis-url" description:"Redis URL to subscribe to" default:"redis://localhost:6379/0/metrics"`
+	RedisUrl               string  `long:"redis-url" description:"Redis URL to subscribe to" default:"redis://rd1:6379/0/metrics"`
 	Readers                int     `long:"readers" description:"Maximum number of simultaneous readers from Redis" default:"2"`
 	ConsumerUrl            string  `long:"consumer-url" description:"WebSocket URL of consumer to publish to" default:"ws://localhost:8080/ws/metrics/store"`
 	Writers                int     `long:"writers" description:"Maximum number of simultaneous writers to the consumer" default:"1"`
